@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Upload, X, Search, Image as ImageIcon, Loader2, Plus, Tag } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Upload, X, Search, Image as ImageIcon, Loader2, Plus, Tag, Camera, RefreshCw } from "lucide-react";
 
 interface Photo {
   id: number | string;
@@ -20,6 +20,45 @@ const PRESET_PHOTOS = [
   { url: "https://images.unsplash.com/photo-1542013936693-884638332954?auto=format&fit=crop&q=80&w=800", title: "옥상 우레탄 방수 시공 완료", phase: "after" },
 ];
 
+const compressAndGetBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 1280;
+        const MAX_HEIGHT = 1280;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        resolve(dataUrl);
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
 export default function PhotoGallery() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +70,9 @@ export default function PhotoGallery() {
   const [newUrl, setNewUrl] = useState("");
   const [newPhase, setNewPhase] = useState("during");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchPhotos = async () => {
     try {
@@ -50,6 +92,24 @@ export default function PhotoGallery() {
   useEffect(() => {
     fetchPhotos();
   }, []);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const dataUrl = await compressAndGetBase64(file);
+      setNewUrl(dataUrl);
+      if (!newTitle) {
+        setNewTitle("현장 촬영 사진");
+      }
+      setIsUploadModalOpen(true);
+    } catch (err) {
+      alert("이미지 처리 중 오류가 발생했습니다.");
+    } finally {
+      e.target.value = "";
+    }
+  };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +154,23 @@ export default function PhotoGallery() {
 
   return (
     <div className="space-y-5">
+      {/* Hidden File Inputs */}
+      <input
+        type="file"
+        accept="image/*"
+        capture="environment"
+        ref={cameraInputRef}
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+      <input
+        type="file"
+        accept="image/*"
+        ref={galleryInputRef}
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
       {/* Controls */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
@@ -107,11 +184,20 @@ export default function PhotoGallery() {
           <Search size={16} className="absolute left-3 top-3 text-gray-400" />
         </div>
         <button
-          onClick={() => setIsUploadModalOpen(true)}
-          className="flex items-center gap-1.5 bg-slate-900 text-white px-3.5 py-2.5 rounded-xl hover:bg-slate-800 transition-colors shadow-md shrink-0 text-xs font-bold"
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-md shrink-0 text-xs font-bold cursor-pointer"
         >
-          <Plus size={16} />
-          <span>사진 추가</span>
+          <Camera size={15} />
+          <span>촬영</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsUploadModalOpen(true)}
+          className="flex items-center gap-1.5 bg-slate-900 text-white px-3 py-2.5 rounded-xl hover:bg-slate-800 transition-colors shadow-md shrink-0 text-xs font-bold cursor-pointer"
+        >
+          <Plus size={15} />
+          <span>추가</span>
         </button>
       </div>
 
@@ -125,8 +211,9 @@ export default function PhotoGallery() {
         ].map((tab) => (
           <button
             key={tab.id}
+            type="button"
             onClick={() => setPhaseFilter(tab.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border shrink-0 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border shrink-0 cursor-pointer ${
               phaseFilter === tab.id
                 ? "bg-blue-600 text-white border-blue-600 shadow-sm"
                 : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
@@ -147,7 +234,7 @@ export default function PhotoGallery() {
         <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
           <ImageIcon className="mx-auto h-10 w-10 mb-2 text-gray-300" />
           <p className="text-sm font-medium">등록된 사진이 없습니다.</p>
-          <p className="text-xs text-gray-400 mt-1">상단의 &apos;사진 추가&apos; 버튼으로 현장 사진을 등록해 보세요.</p>
+          <p className="text-xs text-gray-400 mt-1">상단의 &apos;촬영&apos; 또는 &apos;추가&apos; 버튼으로 현장 사진을 등록해 보세요.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
@@ -193,14 +280,48 @@ export default function PhotoGallery() {
             <div className="flex justify-between items-center pb-2 border-b border-gray-100">
               <h3 className="font-bold text-base text-gray-900">새 현장 사진 등록</h3>
               <button
+                type="button"
                 onClick={() => setIsUploadModalOpen(false)}
-                className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
               >
                 <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleUpload} className="space-y-4">
+              {/* Image Preview / Direct Capture Bar */}
+              {newUrl ? (
+                <div className="relative aspect-video rounded-2xl overflow-hidden bg-black border border-gray-200">
+                  <img src={newUrl} alt="업로드 이미지" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="absolute bottom-2 right-2 bg-black/70 hover:bg-black text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw size={12} /> 재촬영
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="p-4 rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/50 hover:bg-blue-50 text-blue-700 flex flex-col items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Camera size={24} />
+                    <span className="text-xs font-bold">카메라로 직접 촬영</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="p-4 rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-700 flex flex-col items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ImageIcon size={24} />
+                    <span className="text-xs font-bold">앨범에서 선택</span>
+                  </button>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-gray-500 mb-1">사진 제목</label>
                 <input
@@ -211,40 +332,6 @@ export default function PhotoGallery() {
                   onChange={(e) => setNewTitle(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1">사진 이미지 URL</label>
-                <input
-                  type="url"
-                  required
-                  placeholder="https://..."
-                  value={newUrl}
-                  onChange={(e) => setNewUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              {/* Sample Presets */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-400 mb-1.5">샘플 프리셋 선택</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {PRESET_PHOTOS.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setNewUrl(preset.url);
-                        setNewTitle(preset.title);
-                        setNewPhase(preset.phase);
-                      }}
-                      className="text-left text-xs p-2 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50/50 transition-colors"
-                    >
-                      <div className="font-semibold text-gray-700 truncate">{preset.title}</div>
-                      <div className="text-[10px] text-gray-400">{preset.phase}</div>
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div>
@@ -259,10 +346,10 @@ export default function PhotoGallery() {
                       key={phase.id}
                       type="button"
                       onClick={() => setNewPhase(phase.id)}
-                      className={`py-2 rounded-xl text-xs font-bold border transition-colors ${
+                      className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                         newPhase === phase.id
-                          ? "bg-blue-600 text-white border-blue-600"
-                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                          : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                       }`}
                     >
                       {phase.label}
@@ -271,14 +358,21 @@ export default function PhotoGallery() {
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsUploadModalOpen(false)}
+                  className="flex-1 py-3 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
+                >
+                  취소
+                </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !newUrl}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center gap-2"
+                  disabled={!newUrl.trim() || isSubmitting}
+                  className="flex-1 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl transition-colors shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                  현장 사진 업로드
+                  <span>등록 완료</span>
                 </button>
               </div>
             </form>
@@ -286,34 +380,43 @@ export default function PhotoGallery() {
         </div>
       )}
 
-      {/* Expanded Lightbox Modal */}
+      {/* Detail Photo Viewer Modal */}
       {selectedPhoto && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm"
-          onClick={() => setSelectedPhoto(null)}
-        >
-          <div
-            className="relative w-full max-w-4xl max-h-[90vh] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setSelectedPhoto(null)}
-              className="absolute -top-12 right-0 p-2 text-white/80 hover:text-white transition bg-black/40 hover:bg-black/80 rounded-full"
-            >
-              <X size={24} />
-            </button>
-            <img
-              src={selectedPhoto.url}
-              alt={selectedPhoto.title || "현장 사진"}
-              className="rounded-2xl shadow-2xl object-contain max-h-[80vh] w-auto border border-white/10"
-            />
-            <div className="mt-3 bg-black/70 backdrop-blur text-white px-5 py-2.5 rounded-full text-xs font-medium shadow-xl flex items-center gap-2">
-              <span className="font-bold">{selectedPhoto.title || "현장 사진"}</span>
-              {selectedPhoto.phase && (
-                <span className="text-yellow-400 font-semibold">
-                  [{phaseLabel[selectedPhoto.phase]?.label || selectedPhoto.phase}]
-                </span>
-              )}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl space-y-4">
+            <div className="relative aspect-video bg-black">
+              <img src={selectedPhoto.url} alt={selectedPhoto.title || "현장 사진"} className="w-full h-full object-contain" />
+              <button
+                type="button"
+                onClick={() => setSelectedPhoto(null)}
+                className="absolute top-3 right-3 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 pt-0 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base text-gray-900">{selectedPhoto.title || "현장 사진"}</h3>
+                {selectedPhoto.phase && phaseLabel[selectedPhoto.phase] && (
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${phaseLabel[selectedPhoto.phase].color}`}>
+                    {phaseLabel[selectedPhoto.phase].label}
+                  </span>
+                )}
+              </div>
+
+              {selectedPhoto.caption && <p className="text-xs text-gray-600 bg-gray-50 p-3 rounded-xl">{selectedPhoto.caption}</p>}
+
+              <div className="flex justify-between items-center text-[11px] text-gray-400 pt-2 border-t border-gray-100">
+                <span>등록일: {selectedPhoto.uploadedAt ? new Date(selectedPhoto.uploadedAt).toLocaleDateString("ko-KR") : "-"}</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPhoto(null)}
+                  className="px-4 py-1.5 bg-gray-900 text-white font-bold rounded-lg hover:bg-black transition-colors cursor-pointer"
+                >
+                  닫기
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -321,4 +424,3 @@ export default function PhotoGallery() {
     </div>
   );
 }
-

@@ -106,11 +106,19 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: '유효하지 않은 작업 ID입니다.' }, { status: 400 });
     }
 
-    await prisma.task.delete({
-      where: { id: taskId },
+    // 외래키 제약조건 방지를 위해 연관된 정산, 사진, 로그를 트랜잭션으로 안전하게 함께 정리
+    await prisma.$transaction(async (tx) => {
+      // 1. 연결된 정산 내역 삭제
+      await tx.settlement.deleteMany({ where: { taskId } });
+      // 2. 연결된 시공 사진 삭제
+      await tx.taskPhoto.deleteMany({ where: { taskId } });
+      // 3. 연결된 작업 일지 삭제
+      await tx.taskLog.deleteMany({ where: { taskId } });
+      // 4. 작업 본체 삭제
+      await tx.task.deleteMany({ where: { id: taskId } });
     });
 
-    return NextResponse.json({ success: true, message: '작업이 삭제되었습니다.' });
+    return NextResponse.json({ success: true, message: '작업이 성공적으로 삭제되었습니다.' });
   } catch (error) {
     console.error('Failed to delete task:', error);
     return NextResponse.json({ success: false, error: '작업 삭제 중 오류가 발생했습니다.' }, { status: 500 });
