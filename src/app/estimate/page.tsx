@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Calculator, Send, CheckCircle2, CheckSquare, Square, ChevronDown, ChevronUp, Settings } from "lucide-react";
+import {
+  ArrowLeft, Calculator, Send, CheckCircle2, CheckSquare, Square,
+  ChevronDown, ChevronUp, Settings, MessageSquare, Sparkles,
+  Flame, AlertOctagon, HelpCircle, CheckCheck, Lightbulb, AlertTriangle, Wrench
+} from "lucide-react";
+import KakaoAlimtalkModal from "@/components/kakao/KakaoAlimtalkModal";
+import { lookupBoilerError, BOILER_BRANDS, BOILER_ERROR_DATABASE } from "@/lib/boilerErrorCodes";
 
 type CheckBoxProp = {
   label: string;
@@ -96,6 +102,7 @@ export default function EstimateChecklistPage() {
   const [detectionDetails, setDetectionDetails] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
+  const [isKakaoModalOpen, setIsKakaoModalOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -330,14 +337,188 @@ export default function EstimateChecklistPage() {
                 <label className="text-xs font-semibold text-gray-600 px-1">긴급도</label>
                 <input type="text" placeholder="예: 당일 요망" value={basicInfo.urgency} onChange={(e) => setBasicInfo({...basicInfo, urgency: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-600 px-1">보일러 브랜드</label>
-                <input type="text" placeholder="예: 경동, 귀뚜라미" value={basicInfo.boilerBrand} onChange={(e) => setBasicInfo({...basicInfo, boilerBrand: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
+              {/* 보일러 브랜드 & 에러코드 지능형 진단 영역 */}
+              <div className="col-span-2 bg-gradient-to-br from-slate-50 to-blue-50/40 p-4 rounded-2xl border border-blue-100/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Flame size={15} className="text-orange-500" />
+                    보일러 브랜드 & 에러코드 증상 자동 분석
+                  </label>
+                  <span className="text-[10px] font-bold text-blue-600 bg-blue-100/70 px-2 py-0.5 rounded-full">
+                    실시간 누수 진단 연동
+                  </span>
+                </div>
+
+                {/* 브랜드 퀵 선택 칩 */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] text-slate-500 font-semibold">브랜드 선택:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {BOILER_BRANDS.map((brand) => (
+                      <button
+                        key={brand}
+                        type="button"
+                        onClick={() => setBasicInfo({ ...basicInfo, boilerBrand: brand })}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                          basicInfo.boilerBrand === brand
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {brand}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 인풋 입력 행 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold text-slate-600">브랜드 직접입력</label>
+                    <input
+                      type="text"
+                      placeholder="예: 경동나비엔, 귀뚜라미"
+                      value={basicInfo.boilerBrand}
+                      onChange={(e) => setBasicInfo({ ...basicInfo, boilerBrand: e.target.value })}
+                      className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold text-slate-600">에러코드 입력/선택</label>
+                    <input
+                      type="text"
+                      placeholder="예: 02, 28, 95, 17, A, 16"
+                      value={basicInfo.boilerError}
+                      onChange={(e) => setBasicInfo({ ...basicInfo, boilerError: e.target.value })}
+                      className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-bold font-mono text-orange-600"
+                    />
+                  </div>
+                </div>
+
+                {/* 해당 브랜드의 주요 에러코드 빠른 선택 버튼 */}
+                {basicInfo.boilerBrand && BOILER_ERROR_DATABASE[basicInfo.boilerBrand] && (
+                  <div className="space-y-1 pt-1">
+                    <span className="text-[11px] text-slate-500 font-semibold">{basicInfo.boilerBrand} 주요 에러:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.keys(BOILER_ERROR_DATABASE[basicInfo.boilerBrand]).map((code) => {
+                        const info = BOILER_ERROR_DATABASE[basicInfo.boilerBrand][code];
+                        const isHigh = info.leakRisk === "HIGH";
+                        return (
+                          <button
+                            key={code}
+                            type="button"
+                            onClick={() => setBasicInfo({ ...basicInfo, boilerError: code })}
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition-all border ${
+                              basicInfo.boilerError === code
+                                ? "bg-orange-500 text-white border-orange-500 shadow-sm"
+                                : isHigh
+                                ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+                            }`}
+                          >
+                            {code} {isHigh ? "🚨누수" : ""}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 실시간 보일러 에러 진단 & 증상 카드 */}
+                {(() => {
+                  const errorDiag = lookupBoilerError(basicInfo.boilerBrand, basicInfo.boilerError);
+                  if (!errorDiag) return null;
+
+                  const isHigh = errorDiag.leakRisk === "HIGH";
+                  const isMedium = errorDiag.leakRisk === "MEDIUM";
+
+                  return (
+                    <div
+                      className={`p-4 rounded-2xl border text-xs space-y-2.5 animate-in fade-in zoom-in-95 duration-200 shadow-sm ${
+                        isHigh
+                          ? "bg-red-50/90 border-red-200 text-red-950"
+                          : isMedium
+                          ? "bg-amber-50/90 border-amber-200 text-amber-950"
+                          : "bg-blue-50/90 border-blue-200 text-blue-950"
+                      }`}
+                    >
+                      {/* Badge & Title */}
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] ${
+                            isHigh
+                              ? "bg-red-600 text-white"
+                              : isMedium
+                              ? "bg-amber-500 text-white"
+                              : "bg-blue-600 text-white"
+                          }`}
+                        >
+                          {isHigh ? <AlertOctagon size={12} /> : <AlertTriangle size={12} />}
+                          {isHigh
+                            ? "🚨 누수 위험도: 높음 (배관 파열 의심)"
+                            : isMedium
+                            ? "⚠️ 과열/순환 이상 점검"
+                            : "ℹ️ 기계/점화 상태 점검"}
+                        </span>
+                        <span className="font-mono font-bold text-[11px] text-slate-500">
+                          {errorDiag.brand} [{errorDiag.code}]
+                        </span>
+                      </div>
+
+                      {/* Header */}
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900">{errorDiag.title}</h4>
+                        <p className="text-slate-600 mt-0.5 leading-relaxed">{errorDiag.symptom}</p>
+                      </div>
+
+                      {/* Leak Explanation */}
+                      <div className="p-2.5 bg-white/80 rounded-xl border border-black/5 space-y-1">
+                        <span className="font-bold text-slate-800 flex items-center gap-1">
+                          <Lightbulb size={13} className="text-amber-500 shrink-0" />
+                          누수 탐지 관점 원인 분석
+                        </span>
+                        <p className="text-slate-700 leading-relaxed text-[11px]">
+                          {errorDiag.leakExplanation}
+                        </p>
+                      </div>
+
+                      {/* Recommended Action */}
+                      <div className="p-2.5 bg-white/80 rounded-xl border border-black/5 space-y-1">
+                        <span className="font-bold text-slate-800 flex items-center gap-1">
+                          <Wrench size={13} className="text-blue-600 shrink-0" />
+                          현장 권장 조치 및 탐지 수칙
+                        </span>
+                        <p className="text-slate-700 leading-relaxed text-[11px]">
+                          {errorDiag.recommendedAction}
+                        </p>
+                      </div>
+
+                      {/* One Click Apply to Detection Details */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const autoText = `[보일러 에러 진단 - ${errorDiag.brand} 코드 ${errorDiag.code}]\n• 증상: ${errorDiag.title}\n• 누수 분석: ${errorDiag.leakExplanation}\n• 권장 탐지: ${errorDiag.recommendedAction}`;
+                          setDetectionDetails(autoText);
+                          if (isHigh) {
+                            if (!detectChecks.includes("4) 보일러 직수 off")) {
+                              setDetectChecks((prev) => [...prev, "4) 보일러 직수 off", "6) 보일러 온수배관 탐지"]);
+                              setIsDetectOpen(true);
+                            }
+                            if (!requiredWorks.includes("상수도 배관") && !requiredWorks.includes("특수 방수")) {
+                              setRequiredWorks((prev) => [...prev, "상수도 배관", "부분 철거"]);
+                            }
+                          }
+                          alert("보일러 에러 분석 내용이 [탐지 내용 요약] 및 체크리스트에 자동 반영되었습니다!");
+                        }}
+                        className="w-full py-2 bg-slate-900 hover:bg-black text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm mt-1"
+                      >
+                        <CheckCheck size={14} className="text-yellow-400" />
+                        이 진단 결과를 탐지 내용 요약에 자동 반영
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-600 px-1">보일러 에러코드</label>
-                <input type="text" placeholder="예: E001, 15" value={basicInfo.boilerError} onChange={(e) => setBasicInfo({...basicInfo, boilerError: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
-              </div>
+
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-600 px-1">직수 사이즈</label>
                 <input type="text" placeholder="예: 15A" value={basicInfo.boilerPipeSize} onChange={(e) => setBasicInfo({...basicInfo, boilerPipeSize: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
@@ -588,9 +769,35 @@ export default function EstimateChecklistPage() {
                     <CheckCircle2 size={18} /> 고객님께 알림톡이 발송되었습니다.
                   </p>
                 )}
+
+                <div className="pt-2 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsKakaoModalOpen(true)}
+                    className="flex items-center gap-1.5 text-xs text-yellow-800 bg-yellow-100/80 hover:bg-yellow-200 px-3.5 py-2 rounded-xl font-bold transition-all shadow-sm"
+                  >
+                    <MessageSquare size={13} />
+                    알림톡 서식 미리보기 & 테스트 발송
+                  </button>
+                </div>
               </div>
             </section>
           )}
+
+          {/* Kakao Alimtalk Modal */}
+          <KakaoAlimtalkModal
+            isOpen={isKakaoModalOpen}
+            onClose={() => setIsKakaoModalOpen(false)}
+            defaultTemplate="ESTIMATE_DISPATCH"
+            defaultPhone={customerPhone || "010-0000-0000"}
+            defaultParams={{
+              customerName: "고객",
+              leakLocation: basicInfo.leakLocation || "현장",
+              works: requiredWorks.join(", ") || "누수 탐지 및 보수",
+              detectionFee: parseInt(detectionFee) || 300000,
+              estimatedPrice: estimatedPrice || "300,000 ~ 500,000",
+            }}
+          />
         </div>
 
         {/* 🦉 기본 단가 설정 편집용 유리 블러(Glassmorphism) 오버레이 모달 */}

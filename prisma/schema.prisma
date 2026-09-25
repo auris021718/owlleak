@@ -8,23 +8,79 @@ datasource db {
 }
 
 model Customer {
-  id        Int        @id @default(autoincrement())
-  name      String?
-  phone     String     @unique
-  address   String?
-  createdAt DateTime   @default(now())
-  estimates Estimate[]
-  tasks     Task[]
+  id                    Int        @id @default(autoincrement())
+  name                  String?
+  phone                 String     @unique
+  address               String?
+  registrationType      String     @default("direct") // "direct" (내 직접시공 고객) | "dividend" (파트너 10% 배당 고객)
+  registeredByPartnerId Int?       // 등록한 파트너 ID
+  createdAt             DateTime   @default(now())
+  estimates             Estimate[]
+  tasks                 Task[]
+}
+
+model User {
+  id           Int            @id @default(autoincrement())
+  email        String         @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         String         @default("partner") // "admin" | "partner"
+  createdAt    DateTime       @default(now())
+  partner      Partner?
+  taskLogs     TaskLog[]
+  notifications Notification[]
 }
 
 model Partner {
-  id          Int      @id @default(autoincrement())
-  companyName String
-  contactName String?
-  phone       String
-  specialty   String?
-  createdAt   DateTime @default(now())
-  tasks       Task[]
+  id            Int            @id @default(autoincrement())
+  user          User?          @relation(fields: [userId], references: [id])
+  userId        Int?           @unique
+  companyName   String
+  contactName   String?
+  phone         String
+  email         String?
+  specialty     String?        // 업종 (방수, 목수, 배관 등)
+  region        String?        // 담당 지역
+  partnerCode   String?        // 파트너 코드
+  status        String         @default("pending") // active, pending, inactive
+  rating        Float          @default(5.0)
+  completedJobs Int            @default(0)
+  memo          String?
+  createdAt     DateTime       @default(now())
+  tasks         Task[]
+  settlements   Settlement[]
+  subscription  Subscription?
+}
+
+model Subscription {
+  id                Int              @id @default(autoincrement())
+  partner           Partner          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  partnerId         Int              @unique
+  planType          String           @default("master") // "master" (Master 파트너)
+  status            String           @default("active") // "active" | "canceled" | "past_due"
+  price             Int              @default(99000)    // 월 99,000원
+  billingCycle      String           @default("monthly")
+  billingKey        String?          // PG사 정기결제 빌링키
+  customerKey       String?
+  currentPeriodStart DateTime        @default(now())
+  currentPeriodEnd   DateTime        // 다음 결제 예정일
+  canceledAt        DateTime?
+  payments          PaymentHistory[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model PaymentHistory {
+  id             Int          @id @default(autoincrement())
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscriptionId Int
+  amount         Int          @default(99000)
+  orderId        String       @unique
+  paymentKey     String?
+  status         String       @default("SUCCESS") // "SUCCESS" | "FAILED"
+  receiptUrl     String?
+  paidAt         DateTime     @default(now())
 }
 
 model Estimate {
@@ -69,19 +125,75 @@ model Estimate {
 }
 
 model Task {
-  id           Int       @id @default(autoincrement())
-  estimate     Estimate? @relation(fields: [estimateId], references: [id])
-  estimateId   Int?      @unique
-  customer     Customer? @relation(fields: [customerId], references: [id])
-  customerId   Int?
-  partner      Partner?  @relation(fields: [partnerId], references: [id])
-  partnerId    Int?
+  id                    Int          @id @default(autoincrement())
+  estimate              Estimate?    @relation(fields: [estimateId], references: [id])
+  estimateId            Int?         @unique
+  customer              Customer?    @relation(fields: [customerId], references: [id])
+  customerId            Int?
+  partner               Partner?     @relation(fields: [partnerId], references: [id])
+  partnerId             Int?
   
-  title        String
-  status       String    @default("대기중")
-  scheduledDate DateTime?
-  description  String?
+  registrationType      String       @default("direct") // "direct" (내 직접시공) | "dividend" (파트너 10% 배당)
+  registeredByPartnerId Int?         // 배당 수령 파트너 ID
   
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  title                 String
+  status                String       @default("todo") // "todo" | "in-progress" | "done"
+  scheduledDate         DateTime?
+  time                  String?
+  location              String?
+  type                  String       @default("normal") // "normal" | "urgent"
+  description           String?
+  
+  photos       TaskPhoto[]
+  logs         TaskLog[]
+  settlements  Settlement[]
+  
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model TaskPhoto {
+  id         Int      @id @default(autoincrement())
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId     Int
+  url        String
+  title      String?
+  caption    String?
+  phase      String   @default("during") // "before" | "during" | "after"
+  uploadedAt DateTime @default(now())
+}
+
+model TaskLog {
+  id          Int      @id @default(autoincrement())
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId      Int
+  user        User?    @relation(fields: [userId], references: [id])
+  userId      Int?
+  action      String
+  description String?
+  createdAt   DateTime @default(now())
+}
+
+model Settlement {
+  id        Int      @id @default(autoincrement())
+  partner   Partner  @relation(fields: [partnerId], references: [id])
+  partnerId Int
+  task      Task?    @relation(fields: [taskId], references: [id])
+  taskId    Int?
+  amount    Int
+  type      String   @default("job_payout") // "job_payout" (시공비 정산) | "registration_dividend" (일 등록 10% 배당금)
+  rate      Int      @default(100)          // 정산 비율 (100, 90, 10)
+  status    String   @default("pending")    // "pending" | "paid"
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }

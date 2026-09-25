@@ -11,36 +11,31 @@ import {
   Customer, PartnerNotification, JobType
 } from "@/lib/notificationStore";
 
-// ─── 협력사 목록 (partners 페이지와 동일 데이터 구조) ─────────────────────
-const PARTNERS = [
-  { id: "1", companyName: "한성방수",   type: "방수",     manager: "김한성", phone: "010-1234-5678", region: "서울 서초·강남", status: "active"   },
-  { id: "2", companyName: "서울인테리어", type: "인테리어",  manager: "박지훈", phone: "010-9876-5432", region: "서울 전 지역",   status: "active"   },
-  { id: "3", companyName: "강남파이프",  type: "배관",     manager: "이민수", phone: "010-5555-1234", region: "강남·송파·강동", status: "pending"  },
-  { id: "4", companyName: "믿음도배",   type: "도배",     manager: "최영희", phone: "010-7777-8888", region: "경기 남부",     status: "active"   },
-  { id: "5", companyName: "드림미장",   type: "미장",     manager: "정재원", phone: "010-2222-3333", region: "인천·부천",     status: "inactive" },
-];
-
 const PHASE1_SECONDS = 60; // 1차 알림 대기 시간(초)
 
 const JOB_TYPES: JobType[] = ["누수", "방수", "배관", "도배", "미장", "전기", "타일", "목수", "하수도고압세척", "마루부분시공"];
 
 // 지역 키워드 매칭
 function matchRegion(partnerRegion: string, customerRegion: string): boolean {
+  if (!partnerRegion || !customerRegion) return false;
   const keywords = customerRegion.split(/[\s·,]+/).filter(Boolean);
   return keywords.some((kw) => partnerRegion.includes(kw));
 }
 
 // 협력사 알림 목록 생성
-function buildNotifications(customer: Omit<Customer, "id" | "registeredAt" | "phase" | "notifications" | "phase1StartedAt">): PartnerNotification[] {
-  const activePartners = PARTNERS.filter((p) => p.status === "active");
+function buildNotificationsFromPartners(
+  customer: { region: string },
+  partnerList: any[]
+): PartnerNotification[] {
+  const activePartners = partnerList.filter((p) => p.status === "active");
   return activePartners.map((p) => ({
-    partnerId: p.id,
+    partnerId: String(p.id),
     companyName: p.companyName,
     phone: p.phone,
-    region: p.region,
-    type: p.type,
+    region: p.region || "전국",
+    type: p.specialty || p.type || "누수",
     response: "pending",
-    isRegionMatch: matchRegion(p.region, customer.region),
+    isRegionMatch: matchRegion(p.region || "", customer.region || ""),
   }));
 }
 
@@ -246,6 +241,7 @@ function NotificationModal({ customer, onClose, onUpdate }: NotificationModalPro
 // ─── 메인 페이지 ──────────────────────────────────────────────────────────
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeCustomer, setActiveCustomer] = useState<Customer | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -257,27 +253,50 @@ export default function CustomersPage() {
     jobType: "누수" as JobType,
     isUrgent: false,
     detail: "",
+    registrationType: "direct" as "direct" | "dividend",
   });
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
-  // 페이지 진입 시 DB에서 고객 목록 로드
+  // 페이지 진입 시 DB에서 파트너 및 고객 목록 로드
   useEffect(() => {
-    fetch("/api/customers")
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          const withNotis = data.map(c => ({
-             ...c, 
-             notifications: c.notifications?.length ? c.notifications : buildNotifications(c) 
-          }));
-          setCustomers(withNotis);
-        }
-      });
+    // 1. Fetch partners
+    fetch("/api/partners")
+      .then((res) => res.json())
+      .then((data) => {
+        const partnerList = data.success && Array.isArray(data.data) ? data.data : [];
+        setPartners(partnerList);
+
+        // 2. Fetch customers
+        return fetch("/api/customers")
+          .then((res) => res.json())
+          .then((custData) => {
+            if (Array.isArray(custData)) {
+              const withNotis = custData.map((c) => ({
+                ...c,
+                notifications: c.notifications?.length
+                  ? c.notifications
+                  : buildNotificationsFromPartners(c, partnerList),
+              }));
+              setCustomers(withNotis);
+            }
+          });
+      })
+      .catch((err) => console.error("Error loading customer data:", err));
   }, []);
 
+  const [filterType, setFilterType] = useState<"all" | "direct" | "dividend">("all");
+
   const openRegisterModal = () => {
-    setFormData({ name: "", phone: "", region: "", jobType: "누수", isUrgent: false, detail: "" });
+    setFormData({ 
+      name: "", 
+      phone: "", 
+      region: "", 
+      jobType: "누수", 
+      isUrgent: false, 
+      detail: "",
+      registrationType: "direct" as "direct" | "dividend"
+    });
     setIsEditing(false);
     setEditId(null);
     setIsModalOpen(true);
@@ -292,6 +311,7 @@ export default function CustomersPage() {
       jobType: customer.jobType,
       isUrgent: customer.isUrgent,
       detail: customer.detail,
+      registrationType: (customer as any).registrationType || "direct",
     });
     setIsEditing(true);
     setEditId(customer.id);
@@ -312,15 +332,13 @@ export default function CustomersPage() {
         });
 
         if (res.ok) {
-          const result = await res.json();
-          
           // Map back to frontend Customer type
           const updatedCustomer: Customer = {
-            ...customers.find(c => c.id === editId)!,
-            ...formData
+            ...customers.find((c) => c.id === editId)!,
+            ...formData,
           };
 
-          setCustomers(customers.map(c => c.id === editId ? updatedCustomer : c));
+          setCustomers(customers.map((c) => (c.id === editId ? updatedCustomer : c)));
           setIsModalOpen(false);
         } else {
           const errorData = await res.json();
@@ -328,7 +346,7 @@ export default function CustomersPage() {
         }
       } else {
         // Registration logic
-        const notifications = buildNotifications(formData);
+        const notifications = buildNotificationsFromPartners(formData, partners);
         const res = await fetch("/api/customers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -340,8 +358,15 @@ export default function CustomersPage() {
           const withNotis = { ...newCustomer, notifications };
           setCustomers([withNotis, ...customers]);
           setIsModalOpen(false);
-          setActiveCustomer(withNotis);
-          setFormData({ name: "", phone: "", region: "", jobType: "누수", isUrgent: false, detail: "" });
+          setFormData({ 
+            name: "", 
+            phone: "", 
+            region: "", 
+            jobType: "누수", 
+            isUrgent: false, 
+            detail: "",
+            registrationType: "direct"
+          });
         } else {
           const errorData = await res.json();
           alert(`등록 실패: ${errorData.error || "알 수 없는 오류"}`);
@@ -416,8 +441,8 @@ export default function CustomersPage() {
         </header>
 
         <div className="flex-1 overflow-y-auto pb-24">
-          {/* 검색 */}
-          <div className="px-6 pt-5 pb-3">
+          {/* 검색 & 필터 */}
+          <div className="px-6 pt-5 pb-3 space-y-3">
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -428,11 +453,46 @@ export default function CustomersPage() {
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
               />
             </div>
+
+            {/* 필터 탭 */}
+            <div className="flex bg-gray-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setFilterType("all")}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  filterType === "all" ? "bg-white text-blue-900 shadow-sm" : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                전체 ({customers.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterType("direct")}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  filterType === "direct" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                👷 내 시공
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterType("dividend")}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  filterType === "dividend" ? "bg-white text-amber-700 shadow-sm" : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                💰 10% 배당 위탁
+              </button>
+            </div>
           </div>
 
           {/* 고객 목록 */}
           <div className="px-6 space-y-3">
-            <p className="text-xs font-bold text-gray-400">고객 목록 ({filteredCustomers.length})</p>
+            <p className="text-xs font-bold text-gray-400">
+              고객 목록 ({
+                filteredCustomers.filter(c => filterType === "all" || (c as any).registrationType === filterType || (! (c as any).registrationType && filterType === "direct")).length
+              })
+            </p>
 
             {filteredCustomers.length === 0 ? (
               <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
@@ -441,8 +501,12 @@ export default function CustomersPage() {
                 <p className="text-xs text-gray-400 mt-1">상단 &apos;고객 등록&apos; 버튼을 눌러주세요</p>
               </div>
             ) : (
-              filteredCustomers.map((customer) => {
+              filteredCustomers
+                .filter(c => filterType === "all" || (c as any).registrationType === filterType || (! (c as any).registrationType && filterType === "direct"))
+                .map((customer) => {
                 const cfg = PHASE_CONFIG[customer.phase];
+                const isDividend = (customer as any).registrationType === "dividend";
+
                 return (
                   <div
                     key={customer.id}
@@ -450,7 +514,17 @@ export default function CustomersPage() {
                     className="w-full text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all p-4 group cursor-pointer"
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {isDividend ? (
+                          <span className="flex items-center gap-1 text-[11px] font-extrabold text-amber-800 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-full">
+                            💰 10% 배당 위탁
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                            👷 내 직접시공
+                          </span>
+                        )}
+
                         {customer.isUrgent && (
                           <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
                             <AlertTriangle size={10} /> 긴급
@@ -491,7 +565,7 @@ export default function CustomersPage() {
                     </div>
                     {customer.assignedPartner && (
                       <p className="text-xs text-emerald-700 font-semibold mt-2 flex items-center gap-1">
-                        <CheckCircle2 size={11} /> 담당: {customer.assignedPartner}
+                        <CheckCircle2 size={11} /> 담당 협력사: {customer.assignedPartner}
                       </p>
                     )}
                   </div>
@@ -516,15 +590,75 @@ export default function CustomersPage() {
               </div>
 
               <form onSubmit={handleRegister} className="p-6 space-y-5 flex-1">
+                {/* 1. 고객 등록 유형 선택 (내 직접 시공 vs 파트너 배당) */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-2 ml-1">
+                    등록 목적 선택 *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, registrationType: "direct" as any })}
+                      className={`p-3.5 rounded-2xl text-left border transition-all flex flex-col justify-between ${
+                        formData.registrationType !== "dividend"
+                          ? "bg-blue-50/90 border-blue-600 shadow-md ring-2 ring-blue-600/20"
+                          : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-extrabold text-blue-950 flex items-center gap-1">
+                          👷 내 직접 시공
+                        </span>
+                        {formData.registrationType !== "dividend" && (
+                          <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-500 leading-tight">
+                        본인 직접 탐지/시공 <br />
+                        <strong className="text-blue-700">(시공비 100% 수령)</strong>
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, registrationType: "dividend" as any })}
+                      className={`p-3.5 rounded-2xl text-left border transition-all flex flex-col justify-between ${
+                        formData.registrationType === "dividend"
+                          ? "bg-amber-50/90 border-amber-500 shadow-md ring-2 ring-amber-500/20"
+                          : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-extrabold text-amber-950 flex items-center gap-1">
+                          💰 파트너 배당 위탁
+                        </span>
+                        {formData.registrationType === "dividend" && (
+                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-500 leading-tight">
+                        타 협력사 배정/위탁 <br />
+                        <strong className="text-amber-700">(10% 배당금 자동 정산)</strong>
+                      </p>
+                    </button>
+                  </div>
+
+                  {formData.registrationType === "dividend" && (
+                    <div className="mt-2.5 p-3 bg-amber-500/10 border border-amber-300 rounded-xl text-[11px] text-amber-900 leading-relaxed animate-in fade-in">
+                      💡 <strong>10% 배당 혜택</strong>: 타 지역/스케줄로 다른 파트너에게 위탁하며, 해당 파트너가 시공을 완료하면 <strong>총 공사비의 10%</strong>가 등록자(나)에게 배당금으로 자동 정산됩니다.
+                    </div>
+                  )}
+                </div>
+
                 {/* 긴급 여부 */}
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setFormData({ ...formData, isUrgent: false })}
                     className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-all ${!formData.isUrgent ? "bg-blue-50 text-blue-700 border-blue-400 shadow-sm" : "text-gray-400 border-gray-200 hover:bg-gray-50"}`}>
-                    일반
+                    일반 방문
                   </button>
                   <button type="button" onClick={() => setFormData({ ...formData, isUrgent: true })}
                     className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-all ${formData.isUrgent ? "bg-red-50 text-red-700 border-red-400 shadow-sm" : "text-gray-400 border-gray-200 hover:bg-gray-50"}`}>
-                    🚨 긴급
+                    🚨 당일 긴급
                   </button>
                 </div>
 

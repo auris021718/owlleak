@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, FileText, ArrowLeft, Settings, Bell, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, FileText, ArrowLeft, Settings, Bell, LogOut, Building2, CreditCard } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -18,6 +18,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "대시보드 홈", href: "/admin", icon: LayoutDashboard },
     { name: "견적 관리", href: "/admin/estimates", icon: FileText },
     { name: "고객 관리", href: "/admin/customers", icon: Users },
+    { name: "파트너 관리", href: "/admin/partners", icon: Building2 },
+    { name: "정산 관리", href: "/admin/settlements", icon: CreditCard },
   ];
 
   return (
@@ -56,12 +58,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         <div className="p-4 border-t border-slate-800 space-y-2">
-          <Link href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
-            <ArrowLeft size={18} />
+          <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 transition-all text-xs font-semibold">
+            <span>👷 파트너 대시보드 보기</span>
+          </Link>
+          <Link href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all text-xs">
+            <ArrowLeft size={16} />
             <span>앱으로 돌아가기</span>
           </Link>
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all text-left">
-            <LogOut size={18} />
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all text-left text-xs">
+            <LogOut size={16} />
             <span>로그아웃</span>
           </button>
         </div>

@@ -3,7 +3,28 @@ import Link from "next/link";
 import Image from "next/image";
 import prisma from "@/lib/prisma";
 
+import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
+
 export default async function Home() {
+  // Check auth session
+  const cookieStore = await cookies();
+  const token = cookieStore.get("admin_session")?.value;
+  let userRole: string | null = null;
+  let userName: string | null = null;
+
+  if (token) {
+    try {
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || "fallback_secret");
+      const { payload } = await jwtVerify(token, secret);
+      userRole = (payload.role as string) || "partner";
+      userName = (payload.name as string) || (userRole === "admin" ? "관리자" : "파트너");
+    } catch {
+      // invalid token
+    }
+  }
+
+  // Fetch real data
   // Fetch real data
   const inProgressTasksCount = await prisma.task.count({
     where: { status: "진행중" },
@@ -92,9 +113,40 @@ export default async function Home() {
             </div>
             <h1 className="text-xl font-bold tracking-tight">부엉이누수탐지랩</h1>
           </div>
-          <button className="p-2 rounded-full hover:bg-blue-800 transition-colors">
-            <Settings size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {userRole === "admin" ? (
+              <>
+                <Link
+                  href="/admin"
+                  className="px-3 py-1.5 bg-yellow-400 hover:bg-yellow-300 text-blue-950 text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-1"
+                >
+                  👑 관리자
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="px-2.5 py-1.5 bg-blue-800 hover:bg-blue-700 text-emerald-300 text-xs font-bold rounded-xl transition-all border border-blue-700"
+                  title="파트너 대시보드 전환"
+                >
+                  👷 파트너
+                </Link>
+              </>
+            ) : userRole === "partner" ? (
+              <Link
+                href="/dashboard"
+                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-1.5"
+              >
+                👷 {userName || "파트너"} 대시보드
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="px-3 py-1.5 bg-blue-800 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all border border-blue-700 flex items-center gap-1"
+              >
+                <Settings size={14} />
+                로그인
+              </Link>
+            )}
+          </div>
         </header>
 
         {/* Content Body */}
@@ -235,8 +287,8 @@ export default async function Home() {
                 <p className="text-xs text-slate-300 mb-2 leading-relaxed">
                   방수, 인테리어 복구 파트너라면 전용 관리 화면으로 로그인 해주세요.
                 </p>
-                <Link href="/partners" className="max-w-fit flex items-center gap-1 text-sm font-semibold text-yellow-400 hover:text-yellow-300 transition-colors mt-1">
-                  협력사 포털 바로가기
+                <Link href="/dashboard" className="max-w-fit flex items-center gap-1 text-sm font-semibold text-yellow-400 hover:text-yellow-300 transition-colors mt-1">
+                  협력사 대시보드 바로가기
                   <ArrowRight size={14} />
                 </Link>
               </div>

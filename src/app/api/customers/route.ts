@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jwtVerify } from "jose";
 import prisma from "@/lib/prisma";
 
 export async function GET() {
@@ -20,11 +21,12 @@ export async function GET() {
       jobType: task.estimate?.detectionDetails || "누수",
       isUrgent: task.estimate?.urgency === "당일 긴급 방문",
       detail: task.description || "",
+      registrationType: task.registrationType || "direct",
+      registeredByPartnerId: task.registeredByPartnerId,
       registeredAt: task.createdAt.toISOString(),
       phase: task.status === "대기중" ? "phase1" : task.status === "전체알림" ? "phase2" : task.status === "배정완료" ? "assigned" : "unassigned",
       assignedPartner: task.partner?.companyName,
-      notifications: [], // This is simplified for now, as full notification state tracking requires complex DB schema. 
-                         // To keep the UI working smoothly, the client can initialize notifications locally based on region.
+      notifications: [],
       phase1StartedAt: task.createdAt.getTime(),
     }));
 
@@ -38,13 +40,51 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, phone, region, jobType, isUrgent, detail, phase } = body;
+    const { 
+      name, 
+      phone, 
+      region, 
+      jobType, 
+      isUrgent, 
+      detail, 
+      phase, 
+      registrationType = "direct", 
+      assignedPartnerId,
+      registeredByPartnerId: customRegisteredByPartnerId 
+    } = body;
+
+    // Check currently logged-in user to identify registering partner
+    let sessionPartnerId: number | null = null;
+    const cookieHeader = request.headers.get("cookie") || "";
+    const match = cookieHeader.match(/admin_session=([^;]+)/);
+    if (match) {
+      try {
+        const jwtSecret = process.env.JWT_SECRET || "fallback_secret";
+        const { payload } = await jwtVerify(match[1], new TextEncoder().encode(jwtSecret));
+        sessionPartnerId = (payload.partnerId as number) || null;
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    const registeredByPartnerId = customRegisteredByPartnerId || sessionPartnerId || null;
 
     // 1. Upsert Customer (find by phone or create)
     const customer = await prisma.customer.upsert({
       where: { phone },
-      update: { name, address: region },
-      create: { name, phone, address: region },
+      update: { 
+        name, 
+        address: region,
+        registrationType,
+        registeredByPartnerId,
+      },
+      create: { 
+        name, 
+        phone, 
+        address: region,
+        registrationType,
+        registeredByPartnerId,
+      },
     });
 
     // 2. Create Estimate
@@ -66,16 +106,22 @@ export async function POST(request: Request) {
         status: dbStatus,
         customerId: customer.id,
         estimateId: estimate.id,
+        partnerId: assignedPartnerId ? parseInt(String(assignedPartnerId), 10) : (registrationType === "direct" && registeredByPartnerId ? registeredByPartnerId : null),
+        registrationType,
+        registeredByPartnerId,
       },
       include: {
         customer: true,
         estimate: true,
+        partner: true,
       }
     });
 
     const newCustomer = {
       ...body,
       id: task.id.toString(),
+      registrationType,
+      registeredByPartnerId,
       registeredAt: task.createdAt.toISOString(),
       phase1StartedAt: task.createdAt.getTime(),
     };
