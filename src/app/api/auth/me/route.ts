@@ -60,7 +60,7 @@ export async function GET(request: Request) {
       authenticated: true,
       user: {
         id: dbUser?.id || userId || 0,
-        email: dbUser?.email || email || (role === 'admin' ? 'admin@owl.com' : ''),
+        email: dbUser?.email || email || (role === 'admin' ? 'admin@owl-leak.kr' : ''),
         name: dbUser?.name || (payload.name as string) || (role === 'admin' ? '부엉이 관리자' : '파트너'),
         role: dbUser?.role || role,
         partnerId: partnerData?.id || (payload.partnerId as number | null),

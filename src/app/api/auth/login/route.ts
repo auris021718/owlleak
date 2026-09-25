@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
     let userRole = 'admin';
     let userName = '관리자';
-    let userEmail = email || 'admin@owl.com';
+    let userEmail = email || 'admin@owl-leak.kr';
     let userId: number | null = null;
     let partnerId: number | null = null;
 

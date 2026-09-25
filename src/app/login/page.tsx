@@ -71,9 +71,9 @@ function LoginForm() {
 
   const handleQuickLogin = (demoRole: "admin" | "partner") => {
     if (demoRole === "admin") {
-      setEmail("admin@owl.com");
-      setPassword("1234!");
-      handleLogin(undefined, "admin@owl.com", "1234!");
+      setEmail("admin@owl-leak.kr");
+      setPassword("owlleak0815");
+      handleLogin(undefined, "admin@owl-leak.kr", "owlleak0815");
     } else {
       setEmail("hansung@example.com");
       setPassword("1234!");
@@ -199,11 +199,11 @@ function LoginForm() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@owl.com 또는 파트너 이메일"
+                  placeholder="admin@owl-leak.kr 또는 파트너 이메일"
                   className="w-full bg-slate-800/60 border border-slate-700 text-white pl-11 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder:text-slate-500"
                 />
               </div>
-              <p className="text-[11px] text-slate-500 mt-1 ml-1">관리자: admin@owl.com / 파트너: hansung@example.com</p>
+              <p className="text-[11px] text-slate-500 mt-1 ml-1">관리자: admin@owl-leak.kr / 파트너: hansung@example.com</p>
             </div>
 
             <div>

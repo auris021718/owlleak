@@ -25,10 +25,11 @@ async function main() {
   // 2. Create Users
   console.log('🔐 Creating users...');
   const defaultPw = hashPassword('1234!');
+  const adminPw = hashPassword('owlleak0815');
   const adminUser = await prisma.user.create({
     data: {
-      email: 'admin@owl.com',
-      passwordHash: defaultPw,
+      email: 'admin@owl-leak.kr',
+      passwordHash: adminPw,
       name: '부엉이 관리자',
       phone: '010-0000-0000',
       role: 'admin',
