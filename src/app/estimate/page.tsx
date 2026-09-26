@@ -208,17 +208,21 @@ export default function EstimateChecklistPage() {
     else setter([...arr, val]);
   };
 
+  const toggleWork = (workName: string) => {
+    setRequiredWorks(prev => 
+      prev.includes(workName) ? prev.filter(item => item !== workName) : [...prev, workName]
+    );
+  };
+
+  // 실시간 합산 금액 계산
+  const selectedWorksCost = requiredWorks.reduce((sum, name) => sum + (currentCosts[name] ?? 0), 0);
+  const baseDetectionCost = parseInt(detectionFee) || 0;
+  const currentTotalMin = baseDetectionCost + selectedWorksCost;
+  const currentTotalMax = Math.round(currentTotalMin * 1.2);
+
   const calculateEstimate = () => {
-    let minCost = parseInt(detectionFee) || 0; // 기본 출장 및 탐지 비용
-    let addedCost = 0;
-
-    requiredWorks.forEach(workName => {
-      const option = workOptions.find(o => o.name === workName);
-      if (option) addedCost += option.cost;
-    });
-
-    const totalMin = minCost + addedCost;
-    const totalMax = totalMin + (totalMin * 0.2); // +20% for max range
+    const totalMin = currentTotalMin;
+    const totalMax = currentTotalMax;
     
     setEstimatedPrice(
       `${new Intl.NumberFormat('ko-KR').format(totalMin)}원 ~ ${new Intl.NumberFormat('ko-KR').format(totalMax)}원`
@@ -658,37 +662,85 @@ export default function EstimateChecklistPage() {
               </button>
             </div>
             <p className="text-xs text-gray-500 mb-4">* 선택된 항목을 바탕으로 예상 견적이 합산됩니다. 단가 입력 필드에서 즉시 수정 가능합니다.</p>
-            <div className="flex flex-col gap-2">
-              {workOptions.map((work) => (
-                <label key={work.name} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-blue-400 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center transition-colors ${requiredWorks.includes(work.name) ? 'bg-blue-600 border-blue-600' : 'border-2 border-gray-300'}`}>
-                      {requiredWorks.includes(work.name) && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                    </div>
-                    <span className={`text-sm font-medium ${requiredWorks.includes(work.name) ? 'text-gray-900' : 'text-gray-600'}`}>{work.name}</span>
-                  </div>
-
-                  {/* 🦉 실시간 직접 인풋 수정 폼 (이벤트 전파 방지 버블링 차단 완벽 적용) */}
-                  <div 
-                    className="flex items-center gap-1.5"
-                    onClick={(e) => e.stopPropagation()}
+            <div className="flex flex-col gap-2.5">
+              {workOptions.map((work) => {
+                const isChecked = requiredWorks.includes(work.name);
+                return (
+                  <div
+                    key={work.name}
+                    onClick={() => toggleWork(work.name)}
+                    role="checkbox"
+                    aria-checked={isChecked}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === " " || e.key === "Enter") {
+                        e.preventDefault();
+                        toggleWork(work.name);
+                      }
+                    }}
+                    className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer select-none ${
+                      isChecked
+                        ? "bg-blue-50/80 border-blue-500 shadow-sm ring-1 ring-blue-500/30"
+                        : "bg-white border-gray-200 hover:border-blue-300 hover:bg-slate-50/60"
+                    }`}
                   >
-                    <input 
-                      type="text" 
-                      value={currentCosts[work.name] === undefined ? "" : new Intl.NumberFormat('ko-KR').format(currentCosts[work.name])}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
-                        setCurrentCosts(prev => ({ ...prev, [work.name]: val }));
-                      }}
-                      className="w-24 px-2 py-1 text-right text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg text-blue-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
-                      placeholder="0"
-                    />
-                    <span className="text-xs font-semibold text-gray-400">원</span>
-                  </div>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
+                          isChecked
+                            ? "bg-blue-600 border border-blue-600 text-white shadow-sm"
+                            : "border-2 border-gray-300 bg-white"
+                        }`}
+                      >
+                        {isChecked && <CheckCircle2 size={16} className="text-white" />}
+                      </div>
+                      <span className={`text-sm ${isChecked ? "font-bold text-blue-950" : "font-medium text-gray-700"}`}>
+                        {work.name}
+                      </span>
+                    </div>
 
-                  <input type="checkbox" className="hidden" checked={requiredWorks.includes(work.name)} onChange={() => toggleArray(requiredWorks, work.name, setRequiredWorks)} />
-                </label>
-              ))}
+                    {/* 실시간 단가 수정 입력 필드 (클릭/포커스 버블링 차단) */}
+                    <div
+                      className="flex items-center gap-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="text"
+                        value={currentCosts[work.name] === undefined ? "" : new Intl.NumberFormat('ko-KR').format(currentCosts[work.name])}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
+                          setCurrentCosts(prev => ({ ...prev, [work.name]: val }));
+                        }}
+                        className="w-24 px-2.5 py-1.5 text-right text-xs font-bold bg-white border border-gray-200 rounded-lg text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
+                        placeholder="0"
+                      />
+                      <span className="text-xs font-semibold text-gray-500">원</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 실시간 선택 및 금액 요약 배너 */}
+            <div className="mt-4 p-3.5 bg-slate-100/90 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 text-slate-600">
+                <span className="font-bold text-slate-800">선택된 필요 작업:</span>
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 font-bold rounded-full">
+                  {requiredWorks.length}개 선택
+                </span>
+                {requiredWorks.length > 0 && (
+                  <span className="text-slate-500">
+                    (+{new Intl.NumberFormat('ko-KR').format(selectedWorksCost)}원)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 justify-end">
+                <span className="text-slate-500">예상 기본 합산:</span>
+                <span className="font-extrabold text-blue-900 text-sm">
+                  {new Intl.NumberFormat('ko-KR').format(currentTotalMin)}원
+                </span>
+              </div>
             </div>
           </section>
 
