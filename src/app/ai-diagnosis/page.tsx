@@ -48,7 +48,8 @@ export default function AIDiagnosisPage() {
   // Notifications
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto transition for scanner log ticks
@@ -86,9 +87,8 @@ export default function AIDiagnosisPage() {
     }, 2500);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const processFile = (file: File) => {
+    if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
@@ -98,6 +98,25 @@ export default function AIDiagnosisPage() {
         }
       };
       reader.readAsDataURL(file);
+    } else {
+      showToast('이미지 파일(JPG, PNG 등)만 등록 가능합니다.');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processFile(file);
+    }
+    // reset input value so re-selecting same file triggers change
+    e.target.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processFile(file);
     }
   };
 
@@ -232,41 +251,77 @@ export default function AIDiagnosisPage() {
           
           {/* STEP 1: UPLOAD */}
           {step === 'upload' && (
-            <div className="flex flex-col items-center justify-center space-y-6 py-8">
-              <div className="w-20 h-20 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shadow-inner">
-                <Sparkles size={38} className="animate-pulse" />
+            <div className="flex flex-col items-center justify-center space-y-5 py-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <Sparkles size={32} className="animate-pulse" />
               </div>
               
-              <div className="text-center space-y-2">
-                <h2 className="text-xl font-bold text-gray-800">문제 부위 촬영 및 업로드</h2>
-                <p className="text-sm text-gray-500 max-w-xs leading-relaxed">
-                  누수가 의심되는 벽면, 천장, 바닥 사진을 찍어 올려주시면 AI 알고리즘이 분석합니다.
+              <div className="text-center space-y-1.5">
+                <h2 className="text-xl font-bold text-gray-800">누수 사진 등록</h2>
+                <p className="text-xs text-gray-500 max-w-xs leading-relaxed">
+                  누수가 의심되는 벽면, 천장, 바닥 사진을 등록하시면 AI가 원인과 심각도를 분석합니다.
                 </p>
               </div>
 
-              {/* Upload box */}
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-3xl p-8 flex flex-col items-center justify-center gap-3 bg-gray-50 hover:bg-blue-50/30 transition-all cursor-pointer group"
-              >
-                <div className="w-12 h-12 rounded-full bg-white text-gray-400 group-hover:text-blue-500 shadow-sm flex items-center justify-center transition-colors">
-                  <Upload size={22} />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-gray-700">사진 올리기</p>
-                  <p className="text-xs text-gray-400 mt-1">드래그 앤 드롭 또는 파일 선택</p>
-                </div>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileChange} 
-                  accept="image/*" 
-                  capture="environment" 
-                  className="hidden" 
-                />
+              {/* Hidden Inputs for Camera and Gallery */}
+              <input 
+                type="file" 
+                ref={cameraInputRef} 
+                onChange={handleFileChange} 
+                accept="image/*" 
+                capture="environment" 
+                className="hidden" 
+              />
+              <input 
+                type="file" 
+                ref={galleryInputRef} 
+                onChange={handleFileChange} 
+                accept="image/*" 
+                className="hidden" 
+              />
+
+              {/* 2-Option Mode Selection Cards */}
+              <div className="w-full grid grid-cols-2 gap-3.5 pt-2">
+                {/* Mode 1: Camera Capture */}
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center p-5 rounded-2xl bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md shadow-blue-500/25 transition-all hover:scale-[1.02] active:scale-[0.98] group cursor-pointer text-center"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-3 group-hover:bg-white/30 transition-colors">
+                    <Camera size={26} className="text-white" />
+                  </div>
+                  <span className="font-bold text-sm tracking-tight">현장 직접 촬영</span>
+                  <span className="text-[11px] text-blue-100 mt-1">카메라로 즉시 찍기</span>
+                </button>
+
+                {/* Mode 2: Photo / Gallery Upload */}
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center p-5 rounded-2xl bg-white border-2 border-dashed border-gray-300 hover:border-indigo-500 hover:bg-indigo-50/30 text-gray-700 hover:text-indigo-600 shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] group cursor-pointer text-center"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 group-hover:bg-indigo-100 flex items-center justify-center mb-3 transition-colors text-gray-500 group-hover:text-indigo-600">
+                    <Upload size={24} />
+                  </div>
+                  <span className="font-bold text-sm tracking-tight text-gray-800 group-hover:text-indigo-700">사진 파일 업로드</span>
+                  <span className="text-[11px] text-gray-400 group-hover:text-indigo-500 mt-1">앨범 / 보관함에서 선택</span>
+                </button>
               </div>
 
-              <div className="w-full flex items-center gap-3">
+              {/* Drag and Drop Zone Area */}
+              <div 
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                onClick={() => galleryInputRef.current?.click()}
+                className="w-full py-3 px-4 rounded-xl border border-gray-200 bg-gray-50/80 hover:bg-gray-100/80 transition-colors cursor-pointer text-center"
+              >
+                <p className="text-[11px] text-gray-500 font-medium">
+                  🖥️ PC에서는 사진 파일을 이곳에 드래그하여 바로 올릴 수 있습니다.
+                </p>
+              </div>
+
+              <div className="w-full flex items-center gap-3 pt-1">
                 <div className="flex-1 h-px bg-gray-200"></div>
                 <span className="text-xs text-gray-400">또는</span>
                 <div className="flex-1 h-px bg-gray-200"></div>
