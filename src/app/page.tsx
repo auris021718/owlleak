@@ -24,15 +24,11 @@ export default async function Home() {
     }
   }
 
-  // Fetch real data
-  // Fetch real data
-  const inProgressTasksCount = await prisma.task.count({
-    where: { status: "진행중" },
-  });
-
-  const urgentEstimatesCount = await prisma.estimate.count({
-    where: { urgency: { contains: "당일" } },
-  });
+  // Fetch real data safely with error fallbacks
+  let inProgressTasksCount = 0;
+  let urgentEstimatesCount = 0;
+  let weeklyTasks: any[] = [];
+  let upcomingTasks: any[] = [];
 
   // Date calculations for the weekly calendar
   const now = new Date();
@@ -54,20 +50,51 @@ export default async function Home() {
   const weekLabel = `${now.getMonth() + 1}월 ${getWeekOfMonth(now)}주차`;
   const todayLabel = `오늘: ${now.getMonth() + 1}월 ${now.getDate()}일 (${['일', '월', '화', '수', '목', '금', '토'][now.getDay()]})`;
 
-  // Fetch tasks for the entire current week to show dots
   const startOfWeek = new Date(monday);
   const endOfWeek = new Date(monday);
   endOfWeek.setDate(monday.getDate() + 6);
   endOfWeek.setHours(23, 59, 59, 999);
 
-  const weeklyTasks = await prisma.task.findMany({
-    where: {
-      scheduledDate: {
-        gte: startOfWeek,
-        lte: endOfWeek,
-      },
-    },
-  });
+  try {
+    const [tasksCount, estimatesCount, weekTasks, upTasks] = await Promise.all([
+      prisma.task.count({
+        where: {
+          OR: [{ status: "in-progress" }, { status: "진행중" }]
+        },
+      }).catch(() => 0),
+      prisma.estimate.count({
+        where: {
+          OR: [
+            { urgency: { contains: "당일" } },
+            { urgency: { contains: "긴급" } }
+          ]
+        },
+      }).catch(() => 0),
+      prisma.task.findMany({
+        where: {
+          scheduledDate: {
+            gte: startOfWeek,
+            lte: endOfWeek,
+          },
+        },
+      }).catch(() => []),
+      prisma.task.findMany({
+        where: { 
+          scheduledDate: { gte: new Date() } 
+        },
+        orderBy: { scheduledDate: 'asc' },
+        take: 3,
+        include: { customer: true }
+      }).catch(() => [])
+    ]);
+
+    inProgressTasksCount = tasksCount;
+    urgentEstimatesCount = estimatesCount;
+    weeklyTasks = weekTasks;
+    upcomingTasks = upTasks;
+  } catch (error) {
+    console.error("Failed to fetch dashboard data from Prisma:", error);
+  }
 
   // Calendar days generation
   const weekDayLabels = ['월', '화', '수', '목', '금', '토', '일'];
@@ -76,7 +103,7 @@ export default async function Home() {
     date.setDate(monday.getDate() + index);
     const isToday = date.toDateString() === new Date().toDateString();
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-    const hasSchedule = weeklyTasks.some(t => t.scheduledDate && t.scheduledDate.toDateString() === date.toDateString());
+    const hasSchedule = Array.isArray(weeklyTasks) && weeklyTasks.some(t => t.scheduledDate && new Date(t.scheduledDate).toDateString() === date.toDateString());
     
     return {
       day: label,
@@ -85,16 +112,6 @@ export default async function Home() {
       isToday,
       isWeekend
     };
-  });
-
-  // Fetch upcoming tasks for the list below the calendar (3 most recent from now)
-  const upcomingTasks = await prisma.task.findMany({
-    where: { 
-      scheduledDate: { gte: new Date() } 
-    },
-    orderBy: { scheduledDate: 'asc' },
-    take: 3,
-    include: { customer: true }
   });
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 font-sans sm:bg-gray-100 sm:items-center sm:py-10">
