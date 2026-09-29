@@ -6,11 +6,14 @@ import { ShieldAlert, ArrowRight, Loader2, Lock, Mail, Building2, Phone, CheckCi
 import Link from "next/link";
 import { COOPERATING_SPECIALTIES } from "@/lib/partnerType";
 
+import FindAccountModal from "@/components/auth/FindAccountModal";
+
 const PARTNER_SPECIALTIES = ["누수탐지", "누수", "배관", "종합설비"];
 
 function LoginForm() {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [signupType, setSignupType] = useState<"partner" | "cooperating">("partner");
+  const [isFindModalOpen, setIsFindModalOpen] = useState(false);
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -235,6 +238,17 @@ function LoginForm() {
               </div>
             </div>
 
+            <div className="flex items-center justify-between text-xs pt-1 px-1">
+              <span className="text-slate-400">비밀번호를 잊으셨나요?</span>
+              <button
+                type="button"
+                onClick={() => setIsFindModalOpen(true)}
+                className="text-blue-400 hover:text-blue-300 font-bold underline underline-offset-4 transition-colors"
+              >
+                아이디 / 비밀번호 찾기
+              </button>
+            </div>
+
             <button
               type="submit"
               disabled={isLoading || !password}
@@ -414,6 +428,16 @@ function LoginForm() {
             &larr; 일반 앱 홈으로 이동
           </Link>
         </div>
+
+        {/* Find ID / PW Modal */}
+        <FindAccountModal
+          isOpen={isFindModalOpen}
+          onClose={() => setIsFindModalOpen(false)}
+          onSelectFoundEmail={(selectedEmail) => {
+            setEmail(selectedEmail);
+            setActiveTab("login");
+          }}
+        />
       </div>
     </div>
   );
