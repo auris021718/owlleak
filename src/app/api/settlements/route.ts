@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getPartnerClassification } from '@/lib/partnerType';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +63,40 @@ export async function POST(request: Request) {
     const parsedTaskId = taskId ? parseInt(String(taskId), 10) : null;
     const totalAmount = parseInt(String(amount), 10);
 
-    // If taskId is provided, check if it's a 10% dividend registration job
+    // Fetch performing partner classification
+    const performingPartner = await prisma.partner.findUnique({
+      where: { id: parsedPartnerId },
+      select: { id: true, specialty: true, companyName: true },
+    });
+
+    const isCooperating = getPartnerClassification(performingPartner?.specialty).isCooperating;
+
+    // 1. If Performing entity is a Cooperating partner (방수, 타일, 미장, 도배, 목수, 전기 등):
+    // Receives 100% of the agreed amount proposed by the partner.
+    if (isCooperating) {
+      const settlement = await prisma.settlement.create({
+        data: {
+          partnerId: parsedPartnerId,
+          taskId: parsedTaskId,
+          amount: totalAmount,
+          type: type || 'agreed_payout',
+          rate: 100,
+          status,
+        },
+        include: {
+          partner: true,
+          task: { include: { customer: true } },
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: settlement,
+        message: '협력사 파트너 제시 금액 100% 정산이 생성되었습니다.',
+      });
+    }
+
+    // 2. Partner-to-Partner dividend calculation (90% Performing Partner / 10% Registering Partner)
     if (parsedTaskId) {
       const task = await prisma.task.findUnique({
         where: { id: parsedTaskId },
@@ -77,7 +111,7 @@ export async function POST(request: Request) {
         const jobAmount = Math.round(totalAmount * 0.9);
         const dividendAmount = Math.round(totalAmount * 0.1);
 
-        // 1. Create Performing Partner's 90% Job Payout Settlement
+        // Performing Partner's 90% Job Payout Settlement
         const jobSettlement = await prisma.settlement.create({
           data: {
             partnerId: parsedPartnerId,
@@ -93,7 +127,7 @@ export async function POST(request: Request) {
           },
         });
 
-        // 2. Create Registering Partner's 10% Dividend Settlement
+        // Registering Partner's 10% Dividend Settlement
         const dividendSettlement = await prisma.settlement.create({
           data: {
             partnerId: task.registeredByPartnerId,
@@ -113,12 +147,12 @@ export async function POST(request: Request) {
           success: true,
           data: jobSettlement,
           dividendSettlement,
-          message: '시공 정산(90%) 및 일 등록자 배당금(10%)이 분할 생성되었습니다.',
+          message: '파트너 간 시공 정산(90%) 및 일 등록자 배당금(10%)이 생성되었습니다.',
         });
       }
     }
 
-    // Default 100% direct settlement
+    // Default 100% direct settlement for primary partner
     const settlement = await prisma.settlement.create({
       data: {
         partnerId: parsedPartnerId,

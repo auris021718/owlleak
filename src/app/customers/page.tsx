@@ -253,7 +253,7 @@ export default function CustomersPage() {
     jobType: "누수" as JobType,
     isUrgent: false,
     detail: "",
-    registrationType: "direct" as "direct" | "dividend",
+    registrationType: "direct" as "direct" | "dividend" | "cooperating",
   });
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -285,7 +285,7 @@ export default function CustomersPage() {
       .catch((err) => console.error("Error loading customer data:", err));
   }, []);
 
-  const [filterType, setFilterType] = useState<"all" | "direct" | "dividend">("all");
+  const [filterType, setFilterType] = useState<"all" | "direct" | "dividend" | "cooperating">("all");
 
   const openRegisterModal = () => {
     setFormData({ 
@@ -295,7 +295,7 @@ export default function CustomersPage() {
       jobType: "누수", 
       isUrgent: false, 
       detail: "",
-      registrationType: "direct" as "direct" | "dividend"
+      registrationType: "direct" as "direct" | "dividend" | "cooperating"
     });
     setIsEditing(false);
     setEditId(null);
@@ -455,11 +455,11 @@ export default function CustomersPage() {
             </div>
 
             {/* 필터 탭 */}
-            <div className="flex bg-gray-100 p-1 rounded-xl">
+            <div className="flex bg-gray-100 p-1 rounded-xl text-[11px]">
               <button
                 type="button"
                 onClick={() => setFilterType("all")}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                className={`flex-1 py-1.5 font-bold rounded-lg transition-all ${
                   filterType === "all" ? "bg-white text-blue-900 shadow-sm" : "text-gray-500 hover:text-gray-800"
                 }`}
               >
@@ -468,7 +468,7 @@ export default function CustomersPage() {
               <button
                 type="button"
                 onClick={() => setFilterType("direct")}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                className={`flex-1 py-1.5 font-bold rounded-lg transition-all ${
                   filterType === "direct" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-800"
                 }`}
               >
@@ -477,11 +477,20 @@ export default function CustomersPage() {
               <button
                 type="button"
                 onClick={() => setFilterType("dividend")}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                className={`flex-1 py-1.5 font-bold rounded-lg transition-all ${
                   filterType === "dividend" ? "bg-white text-amber-700 shadow-sm" : "text-gray-500 hover:text-gray-800"
                 }`}
               >
-                💰 10% 배당 위탁
+                💰 10% 배당
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterType("cooperating")}
+                className={`flex-1 py-1.5 font-bold rounded-lg transition-all ${
+                  filterType === "cooperating" ? "bg-white text-blue-800 shadow-sm" : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                🤝 협력사 의뢰
               </button>
             </div>
           </div>
@@ -505,7 +514,9 @@ export default function CustomersPage() {
                 .filter(c => filterType === "all" || (c as any).registrationType === filterType || (! (c as any).registrationType && filterType === "direct"))
                 .map((customer) => {
                 const cfg = PHASE_CONFIG[customer.phase];
-                const isDividend = (customer as any).registrationType === "dividend";
+                const regType = (customer as any).registrationType;
+                const isDividend = regType === "dividend";
+                const isCooperating = regType === "cooperating";
 
                 return (
                   <div
@@ -515,7 +526,11 @@ export default function CustomersPage() {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {isDividend ? (
+                        {isCooperating ? (
+                          <span className="flex items-center gap-1 text-[11px] font-extrabold text-blue-800 bg-blue-100/90 border border-blue-300 px-2 py-0.5 rounded-full">
+                            🤝 협력사 의뢰
+                          </span>
+                        ) : isDividend ? (
                           <span className="flex items-center gap-1 text-[11px] font-extrabold text-amber-800 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-full">
                             💰 10% 배당 위탁
                           </span>
@@ -590,62 +605,91 @@ export default function CustomersPage() {
               </div>
 
               <form onSubmit={handleRegister} className="p-6 space-y-5 flex-1">
-                {/* 1. 고객 등록 유형 선택 (내 직접 시공 vs 파트너 배당) */}
+                {/* 1. 고객 등록 유형 선택 (내 직접 시공 vs 파트너 배당 vs 협력사 의뢰) */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-2 ml-1">
                     등록 목적 선택 *
                   </label>
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, registrationType: "direct" as any })}
-                      className={`p-3.5 rounded-2xl text-left border transition-all flex flex-col justify-between ${
-                        formData.registrationType !== "dividend"
+                      className={`p-2.5 rounded-2xl text-left border transition-all flex flex-col justify-between ${
+                        formData.registrationType === "direct"
                           ? "bg-blue-50/90 border-blue-600 shadow-md ring-2 ring-blue-600/20"
                           : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-extrabold text-blue-950 flex items-center gap-1">
-                          👷 내 직접 시공
+                        <span className="text-[11px] font-extrabold text-blue-950 flex items-center gap-0.5">
+                          👷 내 직접시공
                         </span>
-                        {formData.registrationType !== "dividend" && (
-                          <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                        {formData.registrationType === "direct" && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
                         )}
                       </div>
-                      <p className="text-[11px] text-gray-500 leading-tight">
+                      <p className="text-[10px] text-gray-500 leading-tight">
                         본인 직접 탐지/시공 <br />
-                        <strong className="text-blue-700">(시공비 100% 수령)</strong>
+                        <strong className="text-blue-700">(시공비 100%)</strong>
                       </p>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, registrationType: "dividend" as any })}
-                      className={`p-3.5 rounded-2xl text-left border transition-all flex flex-col justify-between ${
+                      className={`p-2.5 rounded-2xl text-left border transition-all flex flex-col justify-between ${
                         formData.registrationType === "dividend"
                           ? "bg-amber-50/90 border-amber-500 shadow-md ring-2 ring-amber-500/20"
                           : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-extrabold text-amber-950 flex items-center gap-1">
-                          💰 파트너 배당 위탁
+                        <span className="text-[11px] font-extrabold text-amber-950 flex items-center gap-0.5">
+                          💰 파트너 배당
                         </span>
                         {formData.registrationType === "dividend" && (
-                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                         )}
                       </div>
-                      <p className="text-[11px] text-gray-500 leading-tight">
-                        타 협력사 배정/위탁 <br />
-                        <strong className="text-amber-700">(10% 배당금 자동 정산)</strong>
+                      <p className="text-[10px] text-gray-500 leading-tight">
+                        타 파트너 위탁 <br />
+                        <strong className="text-amber-700">(10% 배당 정산)</strong>
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, registrationType: "cooperating" as any })}
+                      className={`p-2.5 rounded-2xl text-left border transition-all flex flex-col justify-between ${
+                        formData.registrationType === "cooperating"
+                          ? "bg-indigo-50/90 border-indigo-600 shadow-md ring-2 ring-indigo-600/20"
+                          : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-extrabold text-indigo-950 flex items-center gap-0.5">
+                          🤝 협력사 의뢰
+                        </span>
+                        {formData.registrationType === "cooperating" && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-tight">
+                        방수·타일·도배 등 <br />
+                        <strong className="text-indigo-700">(제시금액 100%)</strong>
                       </p>
                     </button>
                   </div>
 
                   {formData.registrationType === "dividend" && (
                     <div className="mt-2.5 p-3 bg-amber-500/10 border border-amber-300 rounded-xl text-[11px] text-amber-900 leading-relaxed animate-in fade-in">
-                      💡 <strong>10% 배당 혜택</strong>: 타 지역/스케줄로 다른 파트너에게 위탁하며, 해당 파트너가 시공을 완료하면 <strong>총 공사비의 10%</strong>가 등록자(나)에게 배당금으로 자동 정산됩니다.
+                      💡 <strong>10% 배당 혜택</strong>: 타 파트너에게 위탁 후 시공이 완료되면 <strong>총 공사비의 10%</strong>가 등록자(나)에게 배당금으로 자동 정산됩니다.
+                    </div>
+                  )}
+
+                  {formData.registrationType === "cooperating" && (
+                    <div className="mt-2.5 p-3 bg-indigo-500/10 border border-indigo-300 rounded-xl text-[11px] text-indigo-900 leading-relaxed animate-in fade-in">
+                      💡 <strong>협력사 의뢰</strong>: 누수 탐지 후 방수, 타일, 미장, 도배, 목수, 전기 등 후속 복구 시공을 전담 협력업체에 의뢰하며, <strong>파트너가 제시한 금액</strong>이 협력사에 100% 전달됩니다.
                     </div>
                   )}
                 </div>

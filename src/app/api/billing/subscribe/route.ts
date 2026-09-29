@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
+import { getPartnerClassification } from '@/lib/partnerType';
 
 export async function POST(request: Request) {
   try {
@@ -22,10 +23,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '파트너 계정만 구독 신청이 가능합니다.' }, { status: 400 });
     }
 
-    const body = await request.json().catch(() => ({}));
-    const { cardNumber, cardExpiry, planPrice = 99000 } = body;
+    // 2. Fetch partner details to determine classification (협력사: 월 55,000원 / 파트너: 월 99,000원)
+    const partner = await prisma.partner.findUnique({
+      where: { id: partnerId },
+      select: { specialty: true, companyName: true },
+    });
 
-    // 2. Generate mock billing key & customer key (Toss Payments simulation)
+    const classification = getPartnerClassification(partner?.specialty);
+
+    const body = await request.json().catch(() => ({}));
+    const { cardNumber, cardExpiry } = body;
+
+    const planPrice = body.planPrice || classification.monthlyPrice;
+    const planType = classification.planType;
+
+    // 3. Generate mock billing key & customer key (Toss Payments simulation)
     const billingKey = `bill_key_${crypto.randomBytes(8).toString('hex')}`;
     const customerKey = `cust_${partnerId}_${Date.now()}`;
     const orderId = `ORD_SUB_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
@@ -33,12 +45,12 @@ export async function POST(request: Request) {
     const nextBillingDate = new Date();
     nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
 
-    // 3. Upsert Subscription in DB
+    // 4. Upsert Subscription in DB
     const subscription = await prisma.subscription.upsert({
       where: { partnerId },
       update: {
         status: 'active',
-        planType: 'master',
+        planType,
         price: planPrice,
         billingKey,
         customerKey,
@@ -48,7 +60,7 @@ export async function POST(request: Request) {
       },
       create: {
         partnerId,
-        planType: 'master',
+        planType,
         status: 'active',
         price: planPrice,
         billingCycle: 'monthly',
@@ -59,7 +71,7 @@ export async function POST(request: Request) {
       },
     });
 
-    // 4. Create Payment History for first month charge
+    // 5. Create Payment History for first month charge
     const payment = await prisma.paymentHistory.create({
       data: {
         subscriptionId: subscription.id,
@@ -74,7 +86,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: '👑 Master 파트너 월 정기구독(99,000원)이 성공적으로 활성화되었습니다.',
+      message: `${classification.planName}(${planPrice.toLocaleString()}원)이 성공적으로 활성화되었습니다.`,
+      classification,
       subscription,
       payment,
     });

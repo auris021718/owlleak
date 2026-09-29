@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, FileText, ArrowLeft, Settings, Bell, LogOut, Building2, CreditCard } from "lucide-react";
+import { LayoutDashboard, Users, FileText, ArrowLeft, Settings, Bell, LogOut, Building2, CreditCard, Wrench } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -19,6 +19,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "견적 관리", href: "/admin/estimates", icon: FileText },
     { name: "고객 관리", href: "/admin/customers", icon: Users },
     { name: "파트너 관리", href: "/admin/partners", icon: Building2 },
+    { name: "협력사 관리", href: "/admin/cooperating", icon: Wrench },
     { name: "정산 관리", href: "/admin/settlements", icon: CreditCard },
   ];
 

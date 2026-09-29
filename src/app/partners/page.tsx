@@ -8,6 +8,7 @@ import {
   Search, Filter, MapPin, Hash, Loader2, Trash2,
   CreditCard, DollarSign, Receipt, ArrowUpRight
 } from "lucide-react";
+import { getPartnerClassification } from "@/lib/partnerType";
 
 type PartnerStatus = "active" | "pending" | "inactive";
 type PartnerType = "누수" | "방수" | "배관" | "도배" | "미장" | "전기" | "타일" | "목수" | "하수도고압세척" | "마루부분시공";
@@ -321,10 +322,19 @@ export default function PartnersPage() {
                       >
                         <div className="p-4 pb-3">
                           <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${typeColor.bg} ${typeColor.text} ${typeColor.border}`}>
                                 {partner.specialty || "종합설비"}
                               </span>
+                              {getPartnerClassification(partner.specialty).isCooperating ? (
+                                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  🤝 협력사 (월 55,000원)
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  👑 파트너 (월 99,000원)
+                                </span>
+                              )}
                               <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${statusCfg.bg} ${statusCfg.text}`}>
                                 {statusCfg.icon}
                                 {statusCfg.label}

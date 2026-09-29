@@ -5,6 +5,15 @@ import { jwtVerify } from 'jose';
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
+  // 0. Redirect root path '/' directly to /login (https://www.owl-leak.kr/login)
+  if (path === '/') {
+    const host = request.headers.get('host') || '';
+    if (host.includes('owl-leak.kr')) {
+      return NextResponse.redirect('https://www.owl-leak.kr/login');
+    }
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
   // 1. Skip authentication for auth APIs, login page, static files, and public assets
   if (
     path.startsWith('/api/auth') ||

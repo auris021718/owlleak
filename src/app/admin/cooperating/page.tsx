@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import {
-  Building2,
+  Wrench,
   Search,
   Plus,
   CheckCircle2,
@@ -12,18 +12,17 @@ import {
   Phone,
   Mail,
   MapPin,
-  Wrench,
   Edit2,
   Trash2,
   ShieldCheck,
   AlertCircle,
-  ExternalLink,
-  ChevronRight,
-  Filter,
   RefreshCw,
-  Award
+  Award,
+  CreditCard,
+  Building2,
+  Sparkles
 } from "lucide-react";
-import { getPartnerClassification } from "@/lib/partnerType";
+import { getPartnerClassification, COOPERATING_SPECIALTIES } from "@/lib/partnerType";
 
 interface Partner {
   id: number;
@@ -44,22 +43,7 @@ interface Partner {
   };
 }
 
-const SPECIALTY_OPTIONS = [
-  "전체",
-  "누수탐지",
-  "방수",
-  "배관",
-  "배관내시경",
-  "하수도고압세척",
-  "타일",
-  "미장",
-  "도배",
-  "목수",
-  "마루부분시공",
-  "전기"
-];
-
-export default function AdminPartnersPage() {
+export default function AdminCooperatingPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -78,7 +62,7 @@ export default function AdminPartnersPage() {
     contactName: "",
     phone: "",
     email: "",
-    specialty: "누수탐지",
+    specialty: "방수",
     region: "서울 강남구",
     partnerCode: "",
     status: "active",
@@ -93,10 +77,14 @@ export default function AdminPartnersPage() {
       const res = await fetch("/api/partners");
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
-        setPartners(json.data);
+        // Filter specifically for cooperating companies (방수, 타일, 미장, 도배, 목수, 전기, 배관내시경, 하수도고압세척 등)
+        const cooperatingList = json.data.filter((p: Partner) =>
+          getPartnerClassification(p.specialty).isCooperating
+        );
+        setPartners(cooperatingList);
       }
     } catch (e) {
-      console.error("Failed to fetch partners:", e);
+      console.error("Failed to fetch cooperating partners:", e);
     } finally {
       setLoading(false);
     }
@@ -106,60 +94,15 @@ export default function AdminPartnersPage() {
     fetchPartners();
   }, []);
 
-  const handleStatusChange = async (partnerId: number, newStatus: string) => {
-    try {
-      const res = await fetch(`/api/partners/${partnerId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setPartners((prev) =>
-          prev.map((p) => (p.id === partnerId ? { ...p, status: newStatus } : p))
-        );
-        if (selectedPartner?.id === partnerId) {
-          setSelectedPartner((prev) => prev ? { ...prev, status: newStatus } : null);
-        }
-      } else {
-        alert(json.error || "상태 변경 실패");
-      }
-    } catch (e) {
-      alert("상태 변경 중 오류가 발생했습니다.");
-    }
-  };
-
-  const handleDeletePartner = async (partnerId: number, companyName: string) => {
-    if (!confirm(`'${companyName}' 파트너사를 삭제하시겠습니까?\n배정된 작업이 있는 경우 문제가 발생할 수 있습니다.`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/partners/${partnerId}`, { method: "DELETE" });
-      const json = await res.json();
-      if (json.success) {
-        setPartners((prev) => prev.filter((p) => p.id !== partnerId));
-        if (selectedPartner?.id === partnerId) {
-          setSelectedPartner(null);
-          setIsEditModalOpen(false);
-        }
-      } else {
-        alert(json.error || "삭제 실패");
-      }
-    } catch (e) {
-      alert("파트너 삭제 중 오류가 발생했습니다.");
-    }
-  };
-
   const handleOpenAddModal = () => {
     setFormData({
       companyName: "",
       contactName: "",
       phone: "",
       email: "",
-      specialty: "누수탐지",
+      specialty: "방수",
       region: "서울 강남구",
-      partnerCode: `PARTNER-${Math.floor(1000 + Math.random() * 9000)}`,
+      partnerCode: `COOP-${Math.floor(1000 + Math.random() * 9000)}`,
       status: "active",
       rating: 5.0,
       completedJobs: 0,
@@ -175,7 +118,7 @@ export default function AdminPartnersPage() {
       contactName: partner.contactName || "",
       phone: partner.phone || "",
       email: partner.email || "",
-      specialty: partner.specialty || "누수탐지",
+      specialty: partner.specialty || "방수",
       region: partner.region || "",
       partnerCode: partner.partnerCode || "",
       status: partner.status || "active",
@@ -198,9 +141,7 @@ export default function AdminPartnersPage() {
         });
         const json = await res.json();
         if (json.success) {
-          setPartners((prev) =>
-            prev.map((p) => (p.id === selectedPartner.id ? json.data : p))
-          );
+          fetchPartners();
           setIsEditModalOpen(false);
           setSelectedPartner(null);
         } else {
@@ -214,7 +155,7 @@ export default function AdminPartnersPage() {
         });
         const json = await res.json();
         if (json.success) {
-          setPartners((prev) => [json.data, ...prev]);
+          fetchPartners();
           setIsAddModalOpen(false);
         } else {
           alert(json.error || "등록 실패");
@@ -224,6 +165,39 @@ export default function AdminPartnersPage() {
       alert("저장 중 오류가 발생했습니다.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleStatusChange = async (partnerId: number, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/partners/${partnerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setPartners((prev) =>
+          prev.map((p) => (p.id === partnerId ? { ...p, status: newStatus } : p))
+        );
+      }
+    } catch (e) {
+      alert("상태 변경 오류가 발생했습니다.");
+    }
+  };
+
+  const handleDeletePartner = async (partnerId: number) => {
+    if (!confirm("정말 이 협력사를 삭제하시겠습니까?")) return;
+    try {
+      const res = await fetch(`/api/partners/${partnerId}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.success) {
+        setPartners((prev) => prev.filter((p) => p.id !== partnerId));
+      }
+    } catch (e) {
+      alert("삭제 중 오류가 발생했습니다.");
     }
   };
 
@@ -243,16 +217,11 @@ export default function AdminPartnersPage() {
     return matchSearch && matchStatus && matchSpecialty;
   });
 
-  // Summary Metrics
+  // Metrics
   const totalCount = partners.length;
   const pendingCount = partners.filter((p) => p.status === "pending").length;
   const activeCount = partners.filter((p) => p.status === "active").length;
-  const avgRating =
-    totalCount > 0
-      ? (
-          partners.reduce((sum, p) => sum + (p.rating || 0), 0) / totalCount
-        ).toFixed(1)
-      : "5.0";
+  const monthlyRevenue = activeCount * 55000;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-16">
@@ -260,11 +229,14 @@ export default function AdminPartnersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Building2 className="text-blue-600" size={26} />
-            파트너사 관리
+            <Wrench className="text-blue-600" size={26} />
+            협력사 관리
+            <span className="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold rounded-full">
+              월 55,000원 정기구독 요금제
+            </span>
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            등록된 협력업체 프로필, 가입 승인 및 전문분야/지역 현황을 관리합니다.
+            방수·타일·미장·도배·목수·전기·내시경·고압세척 전문 협력업체 프로필 및 구독 현황을 관리합니다.
           </p>
         </div>
 
@@ -281,7 +253,7 @@ export default function AdminPartnersPage() {
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-500/20"
           >
             <Plus size={16} />
-            신규 파트너 등록
+            신규 협력사 등록
           </button>
         </div>
       </div>
@@ -290,11 +262,11 @@ export default function AdminPartnersPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-400">총 파트너사</p>
+            <p className="text-xs font-semibold text-slate-400">총 등록 협력사</p>
             <p className="text-2xl font-black text-slate-800 mt-1">{totalCount}개소</p>
           </div>
           <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <Building2 size={24} />
+            <Wrench size={24} />
           </div>
         </div>
 
@@ -323,18 +295,13 @@ export default function AdminPartnersPage() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-5 rounded-2xl border border-blue-200 bg-blue-50/20 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-400">평균 만족 평점</p>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-2xl font-black text-slate-800">{avgRating}</p>
-              <div className="flex text-amber-400">
-                <Star size={16} fill="currentColor" />
-              </div>
-            </div>
+            <p className="text-xs font-semibold text-blue-600">협력사 월 구독 매출 (MRR)</p>
+            <p className="text-2xl font-black text-blue-700 mt-1">{monthlyRevenue.toLocaleString()}원</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center font-bold">
-            <Award size={24} />
+          <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+            <CreditCard size={24} />
           </div>
         </div>
       </div>
@@ -352,29 +319,24 @@ export default function AdminPartnersPage() {
                   : "hover:text-slate-900"
               }`}
             >
-              전체 ({totalCount})
+              전체 ({partners.length})
             </button>
             <button
               onClick={() => setStatusFilter("pending")}
-              className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1 ${
                 statusFilter === "pending"
-                  ? "bg-amber-500 text-white shadow-sm font-bold"
-                  : "hover:text-slate-900 text-amber-700"
+                  ? "bg-white text-amber-700 shadow-sm font-bold"
+                  : "hover:text-slate-900"
               }`}
             >
-              승인 대기
-              {pendingCount > 0 && (
-                <span className="bg-white text-amber-700 px-1.5 py-0.2 rounded-full text-[10px]">
-                  {pendingCount}
-                </span>
-              )}
+              승인 대기 ({pendingCount})
             </button>
             <button
               onClick={() => setStatusFilter("active")}
               className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap ${
                 statusFilter === "active"
-                  ? "bg-emerald-600 text-white shadow-sm font-bold"
-                  : "hover:text-slate-900 text-emerald-700"
+                  ? "bg-white text-emerald-700 shadow-sm font-bold"
+                  : "hover:text-slate-900"
               }`}
             >
               활동 중 ({activeCount})
@@ -383,20 +345,20 @@ export default function AdminPartnersPage() {
               onClick={() => setStatusFilter("inactive")}
               className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap ${
                 statusFilter === "inactive"
-                  ? "bg-slate-700 text-white shadow-sm font-bold"
-                  : "hover:text-slate-900 text-slate-500"
+                  ? "bg-white text-slate-700 shadow-sm font-bold"
+                  : "hover:text-slate-900"
               }`}
             >
-              정지/미활동
+              정지/미활동 ({partners.filter((p) => p.status === "inactive").length})
             </button>
           </div>
 
           {/* Search & Specialty Filter */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             <div className="relative flex-1 sm:w-64">
               <input
                 type="text"
-                placeholder="업체명, 대표자, 지역, 연락처..."
+                placeholder="협력사명, 대표자, 지역 검색"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 focus:bg-white transition-all"
@@ -409,9 +371,10 @@ export default function AdminPartnersPage() {
               onChange={(e) => setSpecialtyFilter(e.target.value)}
               className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {SPECIALTY_OPTIONS.map((spec) => (
+              <option value="전체">모든 협력업종</option>
+              {COOPERATING_SPECIALTIES.map((spec) => (
                 <option key={spec} value={spec}>
-                  {spec === "전체" ? "모든 전문분야" : spec}
+                  {spec}
                 </option>
               ))}
             </select>
@@ -425,11 +388,11 @@ export default function AdminPartnersPage() {
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 text-xs uppercase tracking-wider">
               <tr>
-                <th className="px-6 py-4">업체명 / 코드</th>
+                <th className="px-6 py-4">협력사명 / 코드</th>
                 <th className="px-6 py-4">대표자 / 연락처</th>
-                <th className="px-6 py-4">전문분야</th>
+                <th className="px-6 py-4">주 전문분야</th>
                 <th className="px-6 py-4">활동 지역</th>
-                <th className="px-6 py-4">평점 / 완료작업</th>
+                <th className="px-6 py-4">구독 요금</th>
                 <th className="px-6 py-4">상태</th>
                 <th className="px-6 py-4 text-center">승인/상태관리</th>
                 <th className="px-6 py-4 text-right">관리</th>
@@ -439,8 +402,8 @@ export default function AdminPartnersPage() {
               {filteredPartners.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
-                    <Building2 className="mx-auto mb-2 text-slate-300" size={32} />
-                    일치하는 파트너 정보가 없습니다.
+                    <Wrench className="mx-auto mb-2 text-slate-300" size={32} />
+                    일치하는 협력사 정보가 없습니다.
                   </td>
                 </tr>
               ) : (
@@ -453,13 +416,13 @@ export default function AdminPartnersPage() {
                     <tr key={partner.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 font-black flex items-center justify-center border border-blue-100">
+                          <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 font-black flex items-center justify-center border border-blue-200">
                             {partner.companyName.charAt(0)}
                           </div>
                           <div>
                             <p className="font-bold text-slate-900">{partner.companyName}</p>
                             <span className="text-[11px] font-mono text-slate-400">
-                              {partner.partnerCode || `#${partner.id}`}
+                              {partner.partnerCode || `#COOP-${partner.id}`}
                             </span>
                           </div>
                         </div>
@@ -475,103 +438,89 @@ export default function AdminPartnersPage() {
 
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1 items-start">
-                          <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 font-semibold px-2.5 py-1 rounded-lg text-xs">
-                            <Wrench size={11} className="text-slate-500" />
-                            {partner.specialty || "누수탐지"}
+                          <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 font-bold px-2.5 py-1 rounded-lg text-xs border border-blue-200">
+                            <Wrench size={11} className="text-blue-500" />
+                            {partner.specialty || "방수"}
                           </span>
-                          {getPartnerClassification(partner.specialty).isCooperating ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                              🤝 협력사 (월 5.5만)
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              👑 파트너 (월 9.9만)
-                            </span>
-                          )}
                         </div>
                       </td>
 
                       <td className="px-6 py-4 text-slate-600 text-xs">
                         <div className="flex items-center gap-1">
                           <MapPin size={12} className="text-slate-400 flex-shrink-0" />
-                          <span>{partner.region || "전국"}</span>
+                          <span>{partner.region || "서울/경기"}</span>
                         </div>
                       </td>
 
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="flex items-center gap-0.5 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                            <Star size={11} fill="currentColor" />
-                            {partner.rating?.toFixed(1) || "5.0"}
-                          </span>
-                          <span className="text-xs text-slate-500 font-semibold">
-                            {partner.completedJobs || 0}건 완료
-                          </span>
-                        </div>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-lg">
+                          월 55,000원
+                        </span>
                       </td>
 
                       <td className="px-6 py-4">
                         {isPending && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
-                            <Clock size={12} /> 승인 대기
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 font-bold rounded-full text-xs border border-amber-200">
+                            <Clock size={12} />
+                            승인 대기
                           </span>
                         )}
                         {isActive && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 size={12} /> 활동 중
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-full text-xs border border-emerald-200">
+                            <CheckCircle2 size={12} />
+                            활동 중
                           </span>
                         )}
                         {isInactive && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">
-                            <XCircle size={12} /> 정지됨
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-500 font-bold rounded-full text-xs border border-slate-200">
+                            <XCircle size={12} />
+                            정지
                           </span>
                         )}
                       </td>
 
-                      {/* Quick Approval Action */}
                       <td className="px-6 py-4 text-center">
                         {isPending ? (
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => handleStatusChange(partner.id, "active")}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1"
-                            >
-                              <CheckCircle2 size={12} /> 승인
-                            </button>
-                            <button
-                              onClick={() => handleStatusChange(partner.id, "inactive")}
-                              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold transition-all border border-rose-200"
-                            >
-                              반려
-                            </button>
-                          </div>
-                        ) : (
-                          <select
-                            value={partner.status}
-                            onChange={(e) => handleStatusChange(partner.id, e.target.value)}
-                            className="text-xs font-semibold px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          <button
+                            onClick={() => handleStatusChange(partner.id, "active")}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
                           >
-                            <option value="active">활동 (Active)</option>
-                            <option value="pending">승인대기 (Pending)</option>
-                            <option value="inactive">정지 (Inactive)</option>
-                          </select>
+                            가입 승인하기
+                          </button>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1">
+                            {isActive ? (
+                              <button
+                                onClick={() => handleStatusChange(partner.id, "inactive")}
+                                className="px-2.5 py-1 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 text-xs font-semibold rounded-lg transition-colors border border-slate-200"
+                              >
+                                정지 처리
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleStatusChange(partner.id, "active")}
+                                className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg transition-colors border border-emerald-200"
+                              >
+                                재활성화
+                              </button>
+                            )}
+                          </div>
                         )}
                       </td>
 
-                      {/* Actions */}
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => handleOpenEditModal(partner)}
                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="상세 정보 및 수정"
+                            title="수정"
                           >
                             <Edit2 size={15} />
                           </button>
                           <button
-                            onClick={() => handleDeletePartner(partner.id, partner.companyName)}
+                            onClick={() => handleDeletePartner(partner.id)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="파트너 삭제"
+                            title="삭제"
                           >
                             <Trash2 size={15} />
                           </button>
@@ -586,217 +535,144 @@ export default function AdminPartnersPage() {
         </div>
       </div>
 
-      {/* Modal: Add or Edit Partner */}
+      {/* Add / Edit Modal */}
       {(isAddModalOpen || isEditModalOpen) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-8">
-            {/* Modal Header */}
-            <div className="px-6 py-5 bg-slate-900 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Building2 size={20} className="text-blue-400" />
-                <h3 className="font-bold text-lg">
-                  {isEditModalOpen ? "파트너사 정보 수정 및 관리" : "신규 파트너사 등록"}
-                </h3>
-              </div>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 border border-slate-100">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Wrench className="text-blue-600" size={20} />
+                {isEditModalOpen ? "협력사 정보 수정" : "신규 협력사 등록 (월 55,000원)"}
+              </h3>
               <button
                 onClick={() => {
                   setIsAddModalOpen(false);
                   setIsEditModalOpen(false);
                 }}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                className="text-slate-400 hover:text-slate-600 p-1"
               >
                 ✕
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSavePartner} className="p-6 space-y-4 text-sm max-h-[80vh] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleSavePartner} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    업체명 (상호명) *
-                  </label>
+                  <label className="font-semibold text-slate-700 block mb-1">협력사명 *</label>
                   <input
                     type="text"
                     required
                     value={formData.companyName}
                     onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                    placeholder="예: 서울누수종합방수"
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="예: 서울방수개발"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    대표자 / 담당자명
-                  </label>
+                  <label className="font-semibold text-slate-700 block mb-1">대표자명</label>
                   <input
                     type="text"
                     value={formData.contactName}
                     onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
-                    placeholder="예: 김기술"
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="예: 홍길동"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    대표 연락처 *
-                  </label>
+                  <label className="font-semibold text-slate-700 block mb-1">연락처 *</label>
                   <input
-                    type="tel"
+                    type="text"
                     required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="010-1234-5678"
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    로그인 이메일
-                  </label>
+                  <label className="font-semibold text-slate-700 block mb-1">이메일</label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="partner@owl.com"
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="coop@example.com"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    주요 전문분야
-                  </label>
+                  <label className="font-semibold text-slate-700 block mb-1">주 협력업종 *</label>
                   <select
                     value={formData.specialty}
                     onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   >
-                    {SPECIALTY_OPTIONS.filter((s) => s !== "전체").map((spec) => (
+                    {COOPERATING_SPECIALTIES.map((spec) => (
                       <option key={spec} value={spec}>
                         {spec}
                       </option>
                     ))}
                   </select>
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    활동 지역 (권역)
-                  </label>
+                  <label className="font-semibold text-slate-700 block mb-1">활동 지역</label>
                   <input
                     type="text"
                     value={formData.region}
                     onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-                    placeholder="예: 서울 강남/서초/송파"
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="서울 강남구/서초구"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    상태
-                  </label>
+                  <label className="font-semibold text-slate-700 block mb-1">협력사 코드</label>
+                  <input
+                    type="text"
+                    value={formData.partnerCode}
+                    onChange={(e) => setFormData({ ...formData, partnerCode: e.target.value })}
+                    placeholder="COOP-1001"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">계정 상태</label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   >
                     <option value="active">활동 중 (승인완료)</option>
                     <option value="pending">가입 승인 대기</option>
-                    <option value="inactive">활동 정지 (일시정지)</option>
+                    <option value="inactive">정지/비활성</option>
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    평점 (0.0 ~ 5.0)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="1.0"
-                    max="5.0"
-                    value={formData.rating}
-                    onChange={(e) => setFormData({ ...formData, rating: parseFloat(e.target.value) || 5.0 })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    완료 작업 수
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.completedJobs}
-                    onChange={(e) => setFormData({ ...formData, completedJobs: parseInt(e.target.value, 10) || 0 })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">
-                  파트너 식별 코드
-                </label>
-                <input
-                  type="text"
-                  value={formData.partnerCode}
-                  onChange={(e) => setFormData({ ...formData, partnerCode: e.target.value })}
-                  placeholder="PARTNER-XXXX"
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">
-                  관리자 메모 / 특이사항
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.memo}
-                  onChange={(e) => setFormData({ ...formData, memo: e.target.value })}
-                  placeholder="장비 보유 현황(적외선 카메라, 내시경 100m 등), 작업 가능 시간대 등 기록"
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-
-              {/* Modal Footer */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setIsAddModalOpen(false);
                     setIsEditModalOpen(false);
                   }}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-semibold transition-colors"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
                 >
                   취소
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl font-bold transition-all shadow-md shadow-blue-500/20 flex items-center gap-2"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-md shadow-blue-500/20"
                 >
-                  {saving ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      저장 중...
-                    </>
-                  ) : (
-                    "저장하기"
-                  )}
+                  {saving ? "저장 중..." : isEditModalOpen ? "수정 완료" : "협력사 등록 완료"}
                 </button>
               </div>
             </form>

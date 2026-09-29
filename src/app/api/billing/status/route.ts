@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import prisma from '@/lib/prisma';
+import { getPartnerClassification } from '@/lib/partnerType';
 
 export async function GET(request: Request) {
   try {
@@ -21,8 +22,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ authenticated: true, isMaster: false, subscription: null }, { status: 200 });
     }
 
-    // If partnerId exists, fetch subscription & payment history
+    // If partnerId exists, fetch partner specialty, subscription & payment history
     if (partnerId) {
+      const partner = await prisma.partner.findUnique({
+        where: { id: partnerId },
+        select: { specialty: true, companyName: true },
+      });
+
+      const classification = getPartnerClassification(partner?.specialty);
+
       const subscription = await prisma.subscription.findUnique({
         where: { partnerId },
         include: {
@@ -33,20 +41,26 @@ export async function GET(request: Request) {
         },
       });
 
-      const isMaster = subscription?.status === 'active';
+      const isSubscribed = subscription?.status === 'active';
 
       return NextResponse.json({
         authenticated: true,
-        isMaster,
+        isMaster: isSubscribed,
+        isSubscribed,
+        classification,
+        specialty: partner?.specialty || null,
+        companyName: partner?.companyName || null,
         subscription,
       });
     }
 
     // If Admin, return overall subscription stats
-    const totalSubscribers = await prisma.subscription.count({
+    const activeSubscriptions = await prisma.subscription.findMany({
       where: { status: 'active' },
+      select: { price: true, planType: true },
     });
-    const totalMRR = totalSubscribers * 99000;
+    const totalSubscribers = activeSubscriptions.length;
+    const totalMRR = activeSubscriptions.reduce((acc, sub) => acc + sub.price, 0);
 
     return NextResponse.json({
       authenticated: true,
