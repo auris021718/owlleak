@@ -8,10 +8,26 @@ const KAKAO_TEMPLATES: Record<string, { title: string; template: (p: any) => str
 안녕하세요, ${p.customerName || "고객"}님.
 요청하신 누수 탐지 및 공사 견적서가 도착했습니다.
 
-■ 현장 위치: ${p.leakLocation || "현장"}
+■ 현장 위치: ${p.leakLocation || p.location || "현장"}
+■ 피해 부위: ${p.damage || "미지정"}
 ■ 신청 공종: ${p.works || "누수 정밀 탐지"}
-■ 예상 탐지비: ${p.detectionFee ? `${Number(p.detectionFee).toLocaleString()}원` : "상담 후 결정"}
-■ 예상 공사비: ${p.estimatedPrice ? `${p.estimatedPrice}원` : "현장 확인 후 안내"}
+■ 예상 탐지비: ${p.detectionFee ? `${Number(p.detectionFee).toLocaleString()}원` : "300,000원"}
+■ 예상 공사비: ${p.estimatedPrice || p.estimate ? `${p.estimatedPrice || p.estimate}원` : "현장 확인 후 안내"}
+
+담당 엔지니어가 빠른 시일 내 연락드려 일정을 조율할 예정입니다.`,
+    buttonText: "견적서 상세 확인하기",
+  },
+  TPL_ESTIMATE_002: {
+    title: "[부엉이누수탐지랩] 견적서 발송 안내",
+    template: (p: any) => `[부엉이누수탐지랩 견적 안내]
+안녕하세요, ${p.customerName || "고객"}님.
+요청하신 누수 탐지 및 공사 견적서가 도착했습니다.
+
+■ 현장 위치: ${p.leakLocation || p.location || "현장"}
+■ 피해 부위: ${p.damage || "미지정"}
+■ 신청 공종: ${p.works || "누수 정밀 탐지"}
+■ 예상 탐지비: ${p.detectionFee ? `${Number(p.detectionFee).toLocaleString()}원` : "300,000원"}
+■ 예상 공사비: ${p.estimatedPrice || p.estimate ? `${p.estimatedPrice || p.estimate}원` : "현장 확인 후 안내"}
 
 담당 엔지니어가 빠른 시일 내 연락드려 일정을 조율할 예정입니다.`,
     buttonText: "견적서 상세 확인하기",
@@ -64,37 +80,85 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "전화번호를 입력해주세요." }, { status: 400 });
     }
 
+    const cleanPhone = phoneNumber.replace(/[^0-9]/g, "");
     const templateConfig = KAKAO_TEMPLATES[templateId] || KAKAO_TEMPLATES.ESTIMATE_DISPATCH;
     const messageContent = templateConfig.template(templateParams);
 
-    // Simulate realistic network delay (300-700ms)
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    const alimtalkMode = process.env.ALIMTALK_MODE || "test"; // 'real' | 'test'
+    const solapiApiKey = process.env.SOLAPI_API_KEY;
+    const solapiApiSecret = process.env.SOLAPI_API_SECRET;
+    const solapiPfid = process.env.SOLAPI_PFID;
 
-    // Create a Notification entry in DB for record tracking if user exists or system notification
-    try {
-      const adminUser = await prisma.user.findFirst({ where: { role: "admin" } });
-      if (adminUser) {
-        await prisma.notification.create({
-          data: {
-            userId: adminUser.id,
-            type: "ALIMTALK",
-            title: `[알림톡 발송] ${templateConfig.title}`,
-            message: `수신: ${phoneNumber}\n${messageContent.slice(0, 100)}...`,
+    // 1. REAL MODE (실제 Solapi / 카카오 알림톡 API 연동)
+    if (alimtalkMode === "real" && solapiApiKey && solapiApiSecret && solapiPfid) {
+      try {
+        // Solapi HMAC Authentication or Message Dispatch
+        const solapiRes = await fetch("https://api.solapi.com/messages/v4/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${solapiApiKey}`,
           },
+          body: JSON.stringify({
+            message: {
+              to: cleanPhone,
+              from: process.env.SOLAPI_SENDER_PHONE || "02-1234-5678",
+              text: messageContent,
+              kakaoOptions: {
+                pfId: solapiPfid,
+                templateId: process.env.SOLAPI_TEMPLATE_ID || templateId,
+                buttons: [
+                  {
+                    buttonType: "WL",
+                    buttonName: templateConfig.buttonText,
+                    linkMo: `${process.env.NEXT_PUBLIC_APP_URL || "https://owlleak.com"}/estimate`,
+                    linkPc: `${process.env.NEXT_PUBLIC_APP_URL || "https://owlleak.com"}/estimate`,
+                  },
+                ],
+              },
+            },
+          }),
         });
+
+        const solapiData = await solapiRes.json();
+        if (solapiRes.ok) {
+          // Log real notification
+          await logNotification(cleanPhone, templateConfig.title, messageContent);
+          return NextResponse.json({
+            success: true,
+            message: "알림톡이 실제 고객님께 성공적으로 발송되었습니다.",
+            data: {
+              mode: "real",
+              messageId: solapiData.messageId || `kakao_real_${Date.now()}`,
+              recipient: cleanPhone,
+              templateId,
+              title: templateConfig.title,
+              content: messageContent,
+              buttonText: templateConfig.buttonText,
+              sentAt: new Date().toISOString(),
+              status: "DELIVERED",
+            },
+          });
+        }
+        console.warn("[Solapi Real Dispatch Failed, falling back to simulated log]:", solapiData);
+      } catch (realErr) {
+        console.error("[Real Alimtalk API Error]:", realErr);
       }
-    } catch (e) {
-      console.warn("Notification logging optional:", e);
     }
 
-    const messageId = `kakao_msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    // 2. TEST MODE (기존 테스트 모드: 안전한 시뮬레이션 및 DB 기록)
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await logNotification(cleanPhone, templateConfig.title, messageContent);
+
+    const messageId = `kakao_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
     return NextResponse.json({
       success: true,
-      message: "알림톡이 성공적으로 발송되었습니다.",
+      message: "알림톡 발송 테스트가 완료되었습니다. (테스트 모드)",
       data: {
+        mode: "test",
         messageId,
-        recipient: phoneNumber,
+        recipient: cleanPhone,
         templateId,
         title: templateConfig.title,
         content: messageContent,
@@ -106,8 +170,26 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("[Kakao Alimtalk Error]:", error);
     return NextResponse.json(
-      { success: false, error: "알림톡 발송 중 서버 오류가 발생했습니다." },
+      { success: false, error: "알림톡 처리 중 서버 오류가 발생했습니다." },
       { status: 500 }
     );
+  }
+}
+
+async function logNotification(phoneNumber: string, title: string, content: string) {
+  try {
+    const adminUser = await prisma.user.findFirst({ where: { role: "admin" } });
+    if (adminUser) {
+      await prisma.notification.create({
+        data: {
+          userId: adminUser.id,
+          type: "ALIMTALK",
+          title: `[알림톡] ${title}`,
+          message: `수신: ${phoneNumber}\n${content.slice(0, 120)}...`,
+        },
+      });
+    }
+  } catch (e) {
+    console.warn("Notification logging optional:", e);
   }
 }

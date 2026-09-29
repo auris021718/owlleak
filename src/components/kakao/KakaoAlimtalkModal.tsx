@@ -338,7 +338,9 @@ export default function KakaoAlimtalkModal({
                 <div className="p-3 bg-emerald-600 text-white rounded-2xl text-xs flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
                   <CheckCircle2 size={16} className="shrink-0" />
                   <div>
-                    <p className="font-bold">발송 완료 (Mock Delivery)</p>
+                    <p className="font-bold">
+                      {sentResult.mode === "real" ? "실제 알림톡 발송 완료" : "알림톡 발송 완료 (테스트 모드)"}
+                    </p>
                     <p className="text-[10px] opacity-90">ID: {sentResult.messageId}</p>
                   </div>
                 </div>
