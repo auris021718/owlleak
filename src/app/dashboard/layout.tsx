@@ -18,8 +18,12 @@ import {
   Phone,
   MapPin,
   Star,
-  Crown
+  Crown,
+  Wrench,
+  Building2,
+  Receipt
 } from "lucide-react";
+import { getPartnerClassification } from "@/lib/partnerType";
 
 interface UserProfile {
   id: number;
@@ -71,6 +75,9 @@ export default function UserDashboardLayout({ children }: { children: React.Reac
     router.refresh();
   };
 
+  const classification = getPartnerClassification(user?.partner?.specialty);
+  const isCooperating = classification.isCooperating;
+
   return (
     <div className="flex min-h-screen bg-slate-900 text-slate-100 font-sans">
       {/* Sidebar (Desktop) */}
@@ -78,12 +85,14 @@ export default function UserDashboardLayout({ children }: { children: React.Reac
         {/* Brand */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-500/20">
-              <HardHat size={18} />
+            <div className={`w-8 h-8 rounded-xl ${isCooperating ? "bg-blue-600" : "bg-emerald-500"} flex items-center justify-center text-slate-950 font-black shadow-lg`}>
+              {isCooperating ? <Wrench size={18} className="text-white" /> : <HardHat size={18} />}
             </div>
             <div>
               <span className="font-bold text-white text-sm tracking-tight block">부엉이 파트너랩</span>
-              <span className="text-[10px] text-emerald-400 font-medium">일반사용자/협력사 포털</span>
+              <span className={`text-[10px] ${isCooperating ? "text-blue-400" : "text-emerald-400"} font-medium`}>
+                {isCooperating ? "🤝 협력사 워크스페이스" : "👑 파트너 포털"}
+              </span>
             </div>
           </Link>
         </div>
@@ -91,7 +100,7 @@ export default function UserDashboardLayout({ children }: { children: React.Reac
         {/* User Card */}
         <div className="p-4 m-3 bg-slate-900/90 border border-slate-800 rounded-2xl">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold">
+            <div className={`w-10 h-10 rounded-full ${isCooperating ? "bg-blue-500/20 border-blue-500/40 text-blue-400" : "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"} border flex items-center justify-center font-bold`}>
               {user?.partner?.companyName?.[0] || user?.name?.[0] || "P"}
             </div>
             <div className="flex-1 min-w-0">
@@ -99,8 +108,8 @@ export default function UserDashboardLayout({ children }: { children: React.Reac
                 <p className="text-xs font-bold text-white truncate">
                   {user?.partner?.companyName || user?.name || "파트너"}
                 </p>
-                <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded">
-                  {user?.role === "admin" ? "관리자" : "협력사"}
+                <span className={`px-1.5 py-0.5 ${isCooperating ? "bg-blue-500/20 text-blue-300" : "bg-emerald-500/20 text-emerald-300"} text-[10px] font-bold rounded`}>
+                  {isCooperating ? "협력사" : "파트너"}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 truncate">
@@ -116,85 +125,121 @@ export default function UserDashboardLayout({ children }: { children: React.Reac
                 {user.partner.rating.toFixed(1)}
               </span>
               <span>시공 {user.partner.completedJobs}회</span>
-              <span className="text-emerald-400 font-medium">{user.partner.specialty || "누수탐지"}</span>
+              <span className={isCooperating ? "text-blue-400 font-bold" : "text-emerald-400 font-bold"}>
+                {user.partner.specialty || (isCooperating ? "방수" : "누수탐지")}
+              </span>
             </div>
           )}
         </div>
 
         {/* Navigation */}
         <div className="p-3 flex-1 overflow-y-auto space-y-1">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">파트너 메뉴</p>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">
+            {isCooperating ? "협력사 전용 메뉴" : "파트너 메뉴"}
+          </p>
           
           <Link
             href="/dashboard"
             className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
               pathname === "/dashboard"
-                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/20"
+                ? isCooperating ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "bg-emerald-600 text-white shadow-lg shadow-emerald-600/20"
                 : "text-slate-400 hover:text-white hover:bg-slate-900"
             }`}
           >
             <LayoutDashboard size={16} />
-            파트너 대시보드 홈
+            {isCooperating ? "협력사 대시보드 홈" : "파트너 대시보드 홈"}
           </Link>
 
-          <Link
-            href="/dashboard/billing"
-            className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-              pathname === "/dashboard/billing"
-                ? "bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20"
-                : "text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
-            }`}
-          >
-            <span className="flex items-center gap-3">
-              <Crown size={16} />
-              Master 구독 & 10% 배당
-            </span>
-            <span className="text-[10px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">
-              9.9만
-            </span>
-          </Link>
-
+          {/* 1. 고객 등록 */}
           <Link
             href="/customers"
-            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-900 transition-all"
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              pathname === "/customers"
+                ? "bg-blue-600 text-white font-bold"
+                : "text-slate-400 hover:text-white hover:bg-slate-900"
+            }`}
           >
             <User size={16} />
-            고객 등록 (내 시공 / 10% 배당)
+            {isCooperating ? "고객 등록 및 의뢰" : "고객 등록 (내 시공 / 10% 배당)"}
           </Link>
 
+          {/* 2. 현장 작업 관리 */}
           <Link
             href="/tasks"
-            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-900 transition-all"
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              pathname === "/tasks"
+                ? "bg-blue-600 text-white font-bold"
+                : "text-slate-400 hover:text-white hover:bg-slate-900"
+            }`}
           >
             <CheckSquare size={16} />
-            현장 작업 관리 및 사진 등록
+            현장 작업 관리 및 사진
           </Link>
 
-          <Link
-            href="/partners"
-            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-900 transition-all"
-          >
-            <CreditCard size={16} />
-            파트너 목록 및 정산
-          </Link>
+          {/* 3. 정산 내역 & 구독 */}
+          {isCooperating ? (
+            <Link
+              href="/dashboard/billing"
+              className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                pathname === "/dashboard/billing"
+                  ? "bg-blue-600 text-white font-bold shadow-lg"
+                  : "text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <Receipt size={16} />
+                협력사 정산 및 구독 관리
+              </span>
+              <span className="text-[10px] bg-blue-400/20 text-blue-300 px-1.5 py-0.5 rounded font-bold">
+                5.5만
+              </span>
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/dashboard/billing"
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  pathname === "/dashboard/billing"
+                    ? "bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20"
+                    : "text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <Crown size={16} />
+                  Master 구독 & 10% 배당
+                </span>
+                <span className="text-[10px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">
+                  9.9만
+                </span>
+              </Link>
 
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 pt-4 mb-2">현장 스마트 도구</p>
+              <Link
+                href="/partners"
+                className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-900 transition-all"
+              >
+                <CreditCard size={16} />
+                파트너 목록 및 정산
+              </Link>
 
-          <Link
-            href="/estimate"
-            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-900 transition-all"
-          >
-            <Sparkles size={16} className="text-yellow-400" />
-            보일러 진단 & 견적 체크리스트
-          </Link>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 pt-4 mb-2">현장 스마트 도구</p>
 
-          <Link
-            href="/ai-diagnosis"
-            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-900 transition-all"
-          >
-            <Sparkles size={16} className="text-blue-400" />
-            AI 사진 누수 판독
-          </Link>
+              <Link
+                href="/estimate"
+                className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-900 transition-all"
+              >
+                <Sparkles size={16} className="text-yellow-400" />
+                보일러 진단 & 견적 체크리스트
+              </Link>
+
+              <Link
+                href="/ai-diagnosis"
+                className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-900 transition-all"
+              >
+                <Sparkles size={16} className="text-blue-400" />
+                AI 사진 누수 판독
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Footer Actions */}
@@ -235,11 +280,13 @@ export default function UserDashboardLayout({ children }: { children: React.Reac
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800 sticky top-0 z-20">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center text-slate-950 font-black">
-              <HardHat size={16} />
+            <div className={`w-7 h-7 rounded-lg ${isCooperating ? "bg-blue-600 text-white" : "bg-emerald-500 text-slate-950"} flex items-center justify-center font-black`}>
+              {isCooperating ? <Wrench size={16} /> : <HardHat size={16} />}
             </div>
             <div>
-              <span className="font-bold text-white text-xs">부엉이 파트너랩</span>
+              <span className="font-bold text-white text-xs">
+                {isCooperating ? "부엉이 협력사 워크스페이스" : "부엉이 파트너랩"}
+              </span>
             </div>
           </div>
 
