@@ -5,7 +5,8 @@ import Link from "next/link";
 import {
   ArrowLeft, Calculator, Send, CheckCircle2, CheckSquare, Square,
   ChevronDown, ChevronUp, Settings, MessageSquare, Sparkles,
-  Flame, AlertOctagon, HelpCircle, CheckCheck, Lightbulb, AlertTriangle, Wrench
+  Flame, AlertOctagon, HelpCircle, CheckCheck, Lightbulb, AlertTriangle, Wrench,
+  PlusCircle, Plus, Trash2
 } from "lucide-react";
 import KakaoAlimtalkModal from "@/components/kakao/KakaoAlimtalkModal";
 import { lookupBoilerError, BOILER_BRANDS, BOILER_ERROR_DATABASE } from "@/lib/boilerErrorCodes";
@@ -94,6 +95,48 @@ export default function EstimateChecklistPage() {
     { name: "타일 마감", cost: currentCosts["타일 마감"] ?? 300000 },
     { name: "마루/바닥 복구", cost: currentCosts["마루/바닥 복구"] ?? 400000 },
     { name: "특수 방수", cost: currentCosts["특수 방수"] ?? 500000 }
+  ];
+
+  // 직접 입력 필요 작업 항목 관리
+  const [customWorkItems, setCustomWorkItems] = useState<Array<{ name: string; cost: number }>>([]);
+  const [customWorkName, setCustomWorkName] = useState<string>("");
+  const [customWorkCost, setCustomWorkCost] = useState<string>("");
+
+  const handleAddCustomWork = () => {
+    const name = customWorkName.trim();
+    if (!name) return;
+    const cost = parseInt(customWorkCost) || 0;
+
+    if (!customWorkItems.some((item) => item.name === name)) {
+      setCustomWorkItems((prev) => [...prev, { name, cost }]);
+    }
+    setCurrentCosts((prev) => ({ ...prev, [name]: cost }));
+
+    if (!requiredWorks.includes(name)) {
+      setRequiredWorks((prev) => [...prev, name]);
+    }
+
+    setCustomWorkName("");
+    setCustomWorkCost("");
+  };
+
+  const handleRemoveCustomWork = (name: string) => {
+    setCustomWorkItems((prev) => prev.filter((item) => item.name !== name));
+    setRequiredWorks((prev) => prev.filter((item) => item !== name));
+    setCurrentCosts((prev) => {
+      const copy = { ...prev };
+      delete copy[name];
+      return copy;
+    });
+  };
+
+  const allWorkOptions = [
+    ...workOptions.map((w) => ({ ...w, isCustom: false })),
+    ...customWorkItems.map((item) => ({
+      name: item.name,
+      cost: currentCosts[item.name] ?? item.cost,
+      isCustom: true,
+    })),
   ];
 
   const [estimatedPrice, setEstimatedPrice] = useState<string | null>(null);
@@ -663,7 +706,7 @@ export default function EstimateChecklistPage() {
             </div>
             <p className="text-xs text-gray-500 mb-4">* 선택된 항목을 바탕으로 예상 견적이 합산됩니다. 단가 입력 필드에서 즉시 수정 가능합니다.</p>
             <div className="flex flex-col gap-2.5">
-              {workOptions.map((work) => {
+              {allWorkOptions.map((work) => {
                 const isChecked = requiredWorks.includes(work.name);
                 return (
                   <div
@@ -697,6 +740,11 @@ export default function EstimateChecklistPage() {
                       <span className={`text-sm ${isChecked ? "font-bold text-blue-950" : "font-medium text-gray-700"}`}>
                         {work.name}
                       </span>
+                      {work.isCustom && (
+                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded">
+                          직접입력
+                        </span>
+                      )}
                     </div>
 
                     {/* 실시간 단가 수정 입력 필드 (클릭/포커스 버블링 차단) */}
@@ -716,10 +764,79 @@ export default function EstimateChecklistPage() {
                         placeholder="0"
                       />
                       <span className="text-xs font-semibold text-gray-500">원</span>
+
+                      {work.isCustom && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveCustomWork(work.name);
+                          }}
+                          className="p-1 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors ml-1"
+                          title="항목 삭제"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
               })}
+            </div>
+
+            {/* 직접 작업 내용 및 금액 입력 필드 */}
+            <div className="mt-3 p-3.5 sm:p-4 bg-slate-50/90 border border-dashed border-blue-300 rounded-2xl space-y-2.5 shadow-sm">
+              <div className="flex items-center justify-between text-xs font-bold text-gray-700">
+                <span className="flex items-center gap-1.5 text-blue-700">
+                  <PlusCircle size={16} />
+                  작업 내용 및 금액 직접 입력
+                </span>
+                <span className="text-[11px] text-gray-400 font-normal">* 현장별 추가 작업 직접 입력</span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  placeholder="작업 내용 입력 (예: 싱크대 수전 교체)"
+                  value={customWorkName}
+                  onChange={(e) => setCustomWorkName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddCustomWork();
+                    }
+                  }}
+                  className="flex-1 px-3.5 py-2.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-800 shadow-sm"
+                />
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <input
+                    type="text"
+                    placeholder="금액"
+                    value={customWorkCost === "" ? "" : new Intl.NumberFormat('ko-KR').format(parseInt(customWorkCost))}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      setCustomWorkCost(val);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddCustomWork();
+                      }
+                    }}
+                    className="w-28 px-3 py-2.5 text-right text-xs font-bold bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-blue-900 shadow-sm"
+                  />
+                  <span className="text-xs font-bold text-gray-500">원</span>
+                  <button
+                    type="button"
+                    onClick={handleAddCustomWork}
+                    disabled={!customWorkName.trim()}
+                    className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 text-white text-xs font-bold rounded-xl shadow transition-all shrink-0 active:scale-95 flex items-center gap-1"
+                  >
+                    <Plus size={14} />
+                    추가
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* 실시간 선택 및 금액 요약 배너 */}
