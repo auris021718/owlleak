@@ -47,16 +47,9 @@ interface Partner {
 const SPECIALTY_OPTIONS = [
   "전체",
   "누수탐지",
-  "방수",
-  "배관",
-  "배관내시경",
-  "하수도고압세척",
-  "타일",
-  "미장",
-  "도배",
-  "목수",
-  "마루부분시공",
-  "전기"
+  "누수공사",
+  "배관공사",
+  "종합설비"
 ];
 
 export default function AdminPartnersPage() {
@@ -93,7 +86,10 @@ export default function AdminPartnersPage() {
       const res = await fetch("/api/partners");
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
-        setPartners(json.data);
+        const masterPartners = json.data.filter(
+          (p: Partner) => !getPartnerClassification(p.specialty).isCooperating
+        );
+        setPartners(masterPartners);
       }
     } catch (e) {
       console.error("Failed to fetch partners:", e);
@@ -264,7 +260,7 @@ export default function AdminPartnersPage() {
             파트너사 관리
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            등록된 협력업체 프로필, 가입 승인 및 전문분야/지역 현황을 관리합니다.
+            등록된 Master 파트너사 프로필, 가입 승인 및 전문분야/지역 현황을 관리합니다.
           </p>
         </div>
 
