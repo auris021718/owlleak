@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       ) {
         return NextResponse.json({
           success: true,
+          emails: [{ email: 'admin@owl-leak.kr', name: '부엉이 관리자', createdAt: new Date() }],
           email: 'admin@owl-leak.kr',
           name: '부엉이 관리자',
           role: 'admin',
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
       ) {
         return NextResponse.json({
           success: true,
+          emails: [{ email: 'hansung@example.com', name: '김한성 (한성방수)', createdAt: new Date() }],
           email: 'hansung@example.com',
           name: '김한성 (한성방수)',
           role: 'partner',
@@ -54,9 +56,12 @@ export async function POST(request: Request) {
           include: { partner: true },
         });
 
-        const matched = users.find((u) => {
+        const inputLast4 = cleanInputPhone.length >= 4 ? cleanInputPhone.slice(-4) : cleanInputPhone;
+
+        const matched = users.filter((u) => {
           const userPhoneClean = (u.phone || '').replace(/[^0-9]/g, '');
           const partnerPhoneClean = (u.partner?.phone || '').replace(/[^0-9]/g, '');
+
           const nameMatch =
             nameOrCompany &&
             (u.name.toLowerCase().includes(nameOrCompany.trim().toLowerCase()) ||
@@ -65,17 +70,26 @@ export async function POST(request: Request) {
 
           const phoneMatch =
             cleanInputPhone &&
-            (userPhoneClean.includes(cleanInputPhone) || partnerPhoneClean.includes(cleanInputPhone));
+            (userPhoneClean.includes(cleanInputPhone) ||
+              partnerPhoneClean.includes(cleanInputPhone) ||
+              cleanInputPhone.includes(userPhoneClean) ||
+              cleanInputPhone.includes(partnerPhoneClean) ||
+              (inputLast4.length === 4 && (userPhoneClean.endsWith(inputLast4) || partnerPhoneClean.endsWith(inputLast4))));
 
           return nameMatch || phoneMatch;
         });
 
-        if (matched) {
+        if (matched.length > 0) {
           return NextResponse.json({
             success: true,
-            email: matched.email,
-            name: matched.partner?.companyName || matched.name,
-            createdAt: matched.createdAt,
+            emails: matched.map((u) => ({
+              email: u.email,
+              name: u.partner?.companyName || u.name,
+              createdAt: u.createdAt,
+            })),
+            email: matched[0].email,
+            name: matched[0].partner?.companyName || matched[0].name,
+            createdAt: matched[0].createdAt,
           });
         }
       } catch (dbError) {
@@ -84,7 +98,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json(
         { success: false, error: '입력하신 정보와 일치하는 회원 계정을 찾을 수 없습니다.' },
-        { status: 444 }
+        { status: 404 }
       );
     }
 
@@ -131,13 +145,43 @@ export async function POST(request: Request) {
         const userPhoneClean = (user.phone || '').replace(/[^0-9]/g, '');
         const partnerPhoneClean = (user.partner?.phone || '').replace(/[^0-9]/g, '');
 
-        if (
-          cleanInputPhone &&
-          !userPhoneClean.includes(cleanInputPhone) &&
-          !partnerPhoneClean.includes(cleanInputPhone)
-        ) {
+        // Fetch all users with same name to check if user registered another phone number (e.g. gmail vs naver account)
+        const sameNameUsers = await prisma.user.findMany({
+          where: {
+            OR: [
+              { name: user.name },
+              { email: user.email },
+              ...(user.partner?.companyName ? [{ partner: { companyName: user.partner.companyName } }] : []),
+            ],
+          },
+          include: { partner: true },
+        });
+
+        const allUserPhones = sameNameUsers
+          .flatMap((u) => [(u.phone || '').replace(/[^0-9]/g, ''), (u.partner?.phone || '').replace(/[^0-9]/g, '')])
+          .filter(Boolean);
+
+        const inputLast4 = cleanInputPhone.length >= 4 ? cleanInputPhone.slice(-4) : cleanInputPhone;
+
+        const isExactMatch =
+          userPhoneClean.includes(cleanInputPhone) ||
+          partnerPhoneClean.includes(cleanInputPhone) ||
+          cleanInputPhone.includes(userPhoneClean) ||
+          cleanInputPhone.includes(partnerPhoneClean);
+
+        const isLast4Match =
+          inputLast4.length === 4 &&
+          (userPhoneClean.endsWith(inputLast4) ||
+            partnerPhoneClean.endsWith(inputLast4) ||
+            allUserPhones.some((p) => p.endsWith(inputLast4)));
+
+        const isSameOwnerPhoneMatch = allUserPhones.some(
+          (p) => p.includes(cleanInputPhone) || cleanInputPhone.includes(p)
+        );
+
+        if (!isExactMatch && !isLast4Match && !isSameOwnerPhoneMatch) {
           return NextResponse.json(
-            { success: false, error: '등록된 휴대폰 번호 정보가 일치하지 않습니다.' },
+            { success: false, error: '등록된 휴대폰 번호 정보가 일치하지 않습니다. 가입 시 사용한 번호 또는 뒤 4자리를 확인해 주세요.' },
             { status: 400 }
           );
         }

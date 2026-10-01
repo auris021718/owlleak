@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Search, KeyRound, Mail, Phone, User, CheckCircle2, AlertCircle, X, ArrowRight, Loader2 } from "lucide-react";
+import { Search, KeyRound, Mail, Phone, User, CheckCircle2, AlertCircle, X, ArrowRight, Loader2, Building2 } from "lucide-react";
+
+interface FoundAccountItem {
+  email: string;
+  name: string;
+  createdAt?: string | Date;
+}
 
 interface FindAccountModalProps {
   isOpen: boolean;
@@ -19,7 +25,7 @@ export default function FindAccountModal({
   // Find ID state
   const [findIdName, setFindIdName] = useState("");
   const [findIdPhone, setFindIdPhone] = useState("");
-  const [foundEmail, setFoundEmail] = useState<string | null>(null);
+  const [foundEmails, setFoundEmails] = useState<FoundAccountItem[]>([]);
   const [findIdError, setFindIdError] = useState("");
   const [isFindingId, setIsFindingId] = useState(false);
 
@@ -37,7 +43,7 @@ export default function FindAccountModal({
   const handleFindId = async (e: React.FormEvent) => {
     e.preventDefault();
     setFindIdError("");
-    setFoundEmail(null);
+    setFoundEmails([]);
     setIsFindingId(true);
 
     try {
@@ -52,8 +58,12 @@ export default function FindAccountModal({
       });
 
       const data = await res.json();
-      if (data.success && data.email) {
-        setFoundEmail(data.email);
+      if (data.success) {
+        if (Array.isArray(data.emails) && data.emails.length > 0) {
+          setFoundEmails(data.emails);
+        } else if (data.email) {
+          setFoundEmails([{ email: data.email, name: data.name || "회원 계정" }]);
+        }
       } else {
         setFindIdError(data.error || "입력하신 정보와 일치하는 계정을 찾을 수 없습니다.");
       }
@@ -143,7 +153,7 @@ export default function FindAccountModal({
               onClick={() => {
                 setSubTab("find_id");
                 setFindIdError("");
-                setFoundEmail(null);
+                setFoundEmails([]);
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                 subTab === "find_id" ? "bg-blue-600 text-white shadow" : "text-slate-400 hover:text-white"
@@ -179,10 +189,9 @@ export default function FindAccountModal({
                   <User size={16} className="absolute left-3.5 top-3 text-slate-500" />
                   <input
                     type="text"
-                    required
                     value={findIdName}
                     onChange={(e) => setFindIdName(e.target.value)}
-                    placeholder="예: 홍길동 또는 한성방수"
+                    placeholder="예: 김재근 또는 한성방수"
                     className="w-full bg-slate-800/80 border border-slate-700 text-white pl-10 pr-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-500"
                   />
                 </div>
@@ -194,10 +203,9 @@ export default function FindAccountModal({
                   <Phone size={16} className="absolute left-3.5 top-3 text-slate-500" />
                   <input
                     type="tel"
-                    required
                     value={findIdPhone}
                     onChange={(e) => setFindIdPhone(e.target.value)}
-                    placeholder="010-0000-0000"
+                    placeholder="010-0000-0000 (또는 뒤 4자리)"
                     className="w-full bg-slate-800/80 border border-slate-700 text-white pl-10 pr-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-500"
                   />
                 </div>
@@ -210,26 +218,39 @@ export default function FindAccountModal({
                 </div>
               )}
 
-              {foundEmail && (
-                <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl space-y-2 text-center">
+              {foundEmails.length > 0 && (
+                <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl space-y-3">
                   <div className="flex items-center justify-center gap-1.5 text-emerald-400 font-bold text-xs">
                     <CheckCircle2 size={16} />
-                    <span>조회된 이메일 계정</span>
+                    <span>조회된 이메일 계정 ({foundEmails.length}건)</span>
                   </div>
-                  <p className="text-lg font-extrabold text-white font-mono bg-slate-950 py-2 px-3 rounded-xl border border-emerald-500/30 tracking-wide select-all">
-                    {foundEmail}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyEmailToLogin(foundEmail)}
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 mt-2"
-                  >
-                    이 계정으로 로그인하기 <ArrowRight size={14} />
-                  </button>
+
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {foundEmails.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-slate-950 p-3 rounded-xl border border-emerald-500/30 flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-white truncate font-mono">{item.email}</p>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {item.name} {item.createdAt ? `(${new Date(item.createdAt).toLocaleDateString()})` : ""}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyEmailToLogin(item.email)}
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-lg shadow transition-all shrink-0 flex items-center gap-1"
+                        >
+                          선택 <ArrowRight size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {!foundEmail && (
+              {foundEmails.length === 0 && (
                 <button
                   type="submit"
                   disabled={isFindingId || (!findIdName && !findIdPhone)}
@@ -268,7 +289,7 @@ export default function FindAccountModal({
                     required
                     value={resetPhone}
                     onChange={(e) => setResetPhone(e.target.value)}
-                    placeholder="010-0000-0000"
+                    placeholder="010-0000-0000 (또는 뒤 4자리)"
                     className="w-full bg-slate-800/80 border border-slate-700 text-white pl-10 pr-3.5 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
