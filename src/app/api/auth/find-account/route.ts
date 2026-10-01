@@ -22,34 +22,6 @@ export async function POST(request: Request) {
         );
       }
 
-      // Demo accounts fallback match
-      if (
-        cleanInputPhone === '0100000000' ||
-        cleanInputPhone === '01000000000' ||
-        (nameOrCompany && nameOrCompany.includes('관리자'))
-      ) {
-        return NextResponse.json({
-          success: true,
-          emails: [{ email: 'admin@owl-leak.kr', name: '부엉이 관리자', createdAt: new Date() }],
-          email: 'admin@owl-leak.kr',
-          name: '부엉이 관리자',
-          role: 'admin',
-        });
-      }
-
-      if (
-        cleanInputPhone === '01012345678' ||
-        (nameOrCompany && (nameOrCompany.includes('한성') || nameOrCompany.includes('김한성')))
-      ) {
-        return NextResponse.json({
-          success: true,
-          emails: [{ email: 'hansung@example.com', name: '김한성 (한성방수)', createdAt: new Date() }],
-          email: 'hansung@example.com',
-          name: '김한성 (한성방수)',
-          role: 'partner',
-        });
-      }
-
       // DB search
       try {
         const users = await prisma.user.findMany({
@@ -120,14 +92,6 @@ export async function POST(request: Request) {
 
       const normalizedEmail = email.trim().toLowerCase();
 
-      // Demo fallback check
-      if (normalizedEmail === 'admin@owl-leak.kr' || normalizedEmail === 'hansung@example.com') {
-        return NextResponse.json({
-          success: true,
-          message: '데모 계정 비밀번호 확인이 완료되었습니다. 새 비밀번호로 로그인해 주세요.',
-        });
-      }
-
       // DB search and update
       try {
         const user = await prisma.user.findUnique({
@@ -145,7 +109,7 @@ export async function POST(request: Request) {
         const userPhoneClean = (user.phone || '').replace(/[^0-9]/g, '');
         const partnerPhoneClean = (user.partner?.phone || '').replace(/[^0-9]/g, '');
 
-        // Fetch all users with same name to check if user registered another phone number (e.g. gmail vs naver account)
+        // Fetch all users with same name to check if user registered another phone number
         const sameNameUsers = await prisma.user.findMany({
           where: {
             OR: [

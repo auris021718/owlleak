@@ -85,18 +85,6 @@ function LoginForm() {
     }
   };
 
-  const handleQuickLogin = (demoRole: "admin" | "partner") => {
-    if (demoRole === "admin") {
-      setEmail("admin@owl-leak.kr");
-      setPassword("owlleak0815");
-      handleLogin(undefined, "admin@owl-leak.kr", "owlleak0815");
-    } else {
-      setEmail("hansung@example.com");
-      setPassword("1234!");
-      handleLogin(undefined, "hansung@example.com", "1234!");
-    }
-  };
-
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -145,31 +133,6 @@ function LoginForm() {
           <p className="text-slate-400 text-xs sm:text-sm mt-1">로그인 권한별 대시보드 맞춤 제공</p>
         </div>
 
-        {/* Quick Demo Switchers */}
-        <div className="mb-5 p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80">
-          <p className="text-[11px] text-slate-400 font-semibold mb-2 text-center">⚡ 원클릭 데모 계정 로그인</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("admin")}
-              disabled={isLoading}
-              className="flex items-center justify-center gap-1.5 py-2 px-3 bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/40 rounded-xl text-blue-300 text-xs font-bold transition-all active:scale-95"
-            >
-              <Shield size={14} className="text-blue-400" />
-              👑 관리자 로그인
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("partner")}
-              disabled={isLoading}
-              className="flex items-center justify-center gap-1.5 py-2 px-3 bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs font-bold transition-all active:scale-95"
-            >
-              <HardHat size={14} className="text-emerald-400" />
-              👷 파트너 로그인
-            </button>
-          </div>
-        </div>
-
         {/* Tab switch */}
         <div className="flex bg-slate-800/80 p-1 rounded-xl mb-5 border border-slate-700">
           <button
@@ -216,11 +179,10 @@ function LoginForm() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@owl-leak.kr 또는 파트너 이메일"
+                  placeholder="이메일 계정 입력"
                   className="w-full bg-slate-800/60 border border-slate-700 text-white pl-11 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder:text-slate-500"
                 />
               </div>
-              <p className="text-[11px] text-slate-500 mt-1 ml-1">관리자: admin@owl-leak.kr / 파트너: hansung@example.com</p>
             </div>
 
             <div>
