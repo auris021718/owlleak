@@ -335,7 +335,7 @@ export default function EstimateChecklistPage() {
       <main className="flex flex-col w-full max-w-md bg-white min-h-screen sm:min-h-full sm:rounded-3xl sm:shadow-2xl">
         {/* Header */}
         <header className="flex items-center gap-3 px-4 py-4 bg-white border-b border-gray-100 sticky top-0 z-20 shadow-sm">
-          <Link href="/" className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-700 transition-colors">
+          <Link href="/dashboard" className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-700 transition-colors" title="대시보드로 돌아가기">
             <ArrowLeft size={24} />
           </Link>
           <h1 className="text-lg font-bold text-gray-900 tracking-tight">현장 체크리스트 & 견적</h1>

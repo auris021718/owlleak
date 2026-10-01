@@ -386,8 +386,8 @@ function LoginForm() {
         )}
 
         <div className="mt-4 text-center">
-          <Link href="/" className="text-xs text-slate-400 hover:text-white transition-colors">
-            &larr; 일반 앱 홈으로 이동
+          <Link href="/estimate" className="text-xs text-slate-400 hover:text-white transition-colors">
+            &rarr; 현장 진단 및 견적 계산기로 이동
           </Link>
         </div>
 

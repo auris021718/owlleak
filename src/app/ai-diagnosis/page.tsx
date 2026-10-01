@@ -229,7 +229,7 @@ export default function AIDiagnosisPage() {
         
         {/* Header */}
         <header className="flex items-center gap-3 px-6 py-5 bg-gradient-to-r from-blue-900 to-indigo-900 text-white shadow-md">
-          <Link href="/" className="p-1.5 rounded-full hover:bg-blue-800 transition-colors">
+          <Link href="/dashboard" className="p-1.5 rounded-full hover:bg-blue-800 transition-colors" title="대시보드로 돌아가기">
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-1.5">

@@ -141,7 +141,7 @@ export default function CalendarPage() {
         {/* Header */}
         <header className="flex items-center justify-between px-4 py-4 bg-white border-b border-gray-100 sticky top-0 z-10">
           <div className="flex items-center gap-2">
-            <Link href="/" className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600">
+            <Link href="/dashboard" className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600" title="대시보드로 돌아가기">
               <ArrowLeft size={20} />
             </Link>
             <h1 className="text-lg font-bold text-gray-800 tracking-tight">전체 일정 캘린더</h1>

@@ -198,7 +198,7 @@ export default function PartnersPage() {
         {/* 헤더 */}
         <header className="flex items-center justify-between px-4 py-4 bg-slate-900 text-white sticky top-0 z-10">
           <div className="flex items-center gap-2">
-            <Link href="/" className="p-2 rounded-full hover:bg-slate-700 transition-colors text-slate-300">
+            <Link href="/dashboard" className="p-2 rounded-full hover:bg-slate-700 transition-colors text-slate-300" title="대시보드로 돌아가기">
               <ArrowLeft size={20} />
             </Link>
             <div className="flex items-center gap-2">

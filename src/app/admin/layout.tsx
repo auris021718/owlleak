@@ -62,9 +62,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 transition-all text-xs font-semibold">
             <span>👷 파트너 대시보드 보기</span>
           </Link>
-          <Link href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all text-xs">
+          <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all text-xs">
             <ArrowLeft size={16} />
-            <span>앱으로 돌아가기</span>
+            <span>대시보드로 돌아가기</span>
           </Link>
           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all text-left text-xs">
             <LogOut size={16} />

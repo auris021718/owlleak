@@ -84,7 +84,7 @@ export default function UserDashboardLayout({ children }: { children: React.Reac
       <aside className="hidden md:flex w-72 bg-slate-950/80 border-r border-slate-800/80 flex-col flex-shrink-0 backdrop-blur-xl">
         {/* Brand */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href="/dashboard" className="flex items-center gap-2.5">
             <div className={`w-8 h-8 rounded-xl ${isCooperating ? "bg-blue-600" : "bg-emerald-500"} flex items-center justify-center text-slate-950 font-black shadow-lg`}>
               {isCooperating ? <Wrench size={18} className="text-white" /> : <HardHat size={18} />}
             </div>
@@ -258,11 +258,11 @@ export default function UserDashboardLayout({ children }: { children: React.Reac
           )}
 
           <Link
-            href="/"
+            href="/estimate"
             className="flex items-center gap-2 px-3.5 py-2 text-xs text-slate-400 hover:text-white transition-colors"
           >
             <Home size={14} />
-            일반 모바일 앱 홈으로 이동
+            현장 견적 진단 도구 이동
           </Link>
 
           <button

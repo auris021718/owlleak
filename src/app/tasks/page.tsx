@@ -14,7 +14,7 @@ export default function TasksPage() {
       <main className="flex flex-col w-full max-w-md bg-white min-h-screen sm:min-h-full sm:rounded-3xl sm:overflow-hidden sm:shadow-2xl">
         {/* Header */}
         <header className="flex items-center px-4 py-4 bg-white border-b border-gray-100 sticky top-0 z-10">
-          <Link href="/" className="p-2 rounded-full hover:bg-gray-100 transition-colors mr-2 text-gray-600">
+          <Link href="/dashboard" className="p-2 rounded-full hover:bg-gray-100 transition-colors mr-2 text-gray-600" title="대시보드로 돌아가기">
             <ArrowLeft size={20} />
           </Link>
           <h1 className="text-lg font-bold text-gray-800 tracking-tight">작업 관리 및 사진</h1>

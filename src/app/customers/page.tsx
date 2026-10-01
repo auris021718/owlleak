@@ -421,7 +421,7 @@ export default function CustomersPage() {
         {/* 헤더 */}
         <header className="flex items-center justify-between px-4 py-4 bg-blue-900 text-white sticky top-0 z-10">
           <div className="flex items-center gap-2">
-            <Link href="/" className="p-2 rounded-full hover:bg-blue-800 transition-colors text-blue-200">
+            <Link href="/dashboard" className="p-2 rounded-full hover:bg-blue-800 transition-colors text-blue-200" title="대시보드로 돌아가기">
               <ArrowLeft size={20} />
             </Link>
             <div className="flex items-center gap-2">
