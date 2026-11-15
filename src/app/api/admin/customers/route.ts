@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+// [보안] 관리자 API는 role === 'admin' 검증 필수
+import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    if (!(await requireAdmin(request))) {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
     const filter = searchParams.get('filter');
@@ -53,6 +58,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    if (!(await requireAdmin(request))) {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
     const body = await request.json();
     const { name, phone, address } = body;
 

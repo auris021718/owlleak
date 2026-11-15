@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import crypto from 'crypto';
-
-function hashPassword(password: string) {
-  return crypto.createHash('sha256').update(password).digest('hex');
-}
+// [보안] bcrypt 해싱으로 교체 (SHA-256 무솔트 제거)
+import { hashPassword } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
@@ -18,6 +15,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // [보안] 최소 비밀번호 길이 강화
+    if (String(password).length < 8) {
+      return NextResponse.json(
+        { success: false, error: '비밀번호는 최소 8자 이상이어야 합니다.' },
+        { status: 400 }
+      );
+    }
+
     // Check duplicate email
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -27,7 +32,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const hashedPassword = hashPassword(password);
+    const hashedPassword = await hashPassword(password);
 
     // Create user and partner transactionally
     const newUser = await prisma.user.create({

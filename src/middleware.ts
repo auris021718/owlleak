@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
+// [보안] JWT_SECRET이 없거나 너무 짧으면 null (fallback 시크릿 사용 금지)
+function getMiddlewareSecret(): Uint8Array | null {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) return null;
+  return new TextEncoder().encode(secret);
+}
+
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
@@ -56,7 +63,11 @@ export async function middleware(request: NextRequest) {
 
   // 5. Verify token and check role
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'fallback_secret');
+    const secret = getMiddlewareSecret();
+    if (!secret) {
+      // [보안] 시크릿 미설정 시 보호 경로 접근을 전부 차단
+      throw new Error('[보안] JWT_SECRET 환경변수가 설정되지 않았습니다.');
+    }
     const { payload } = await jwtVerify(token, secret);
     const userRole = (payload.role as string) || 'partner';
 

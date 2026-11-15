@@ -1,13 +1,11 @@
 const { PrismaClient } = require('@prisma/client');
+// [보안] bcrypt 해싱 + 1회성 임시 비밀번호 (하드코딩 'owlleak0815' 제거)
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const prisma = new PrismaClient();
 
-function hashPassword(password) {
-  return crypto.createHash('sha256').update(password).digest('hex');
-}
-
 async function main() {
-  console.log('🌱 Starting database system initialization...');
+  console.log('Starting database system initialization...');
 
   // Ensure default Admin Account exists
   const adminEmail = 'admin@owl-leak.kr';
@@ -16,7 +14,8 @@ async function main() {
   });
 
   if (!existingAdmin) {
-    const adminPw = hashPassword('owlleak0815');
+    const tempPassword = crypto.randomBytes(12).toString('base64url');
+    const adminPw = await bcrypt.hash(tempPassword, 12);
     await prisma.user.create({
       data: {
         email: adminEmail,
@@ -26,17 +25,21 @@ async function main() {
         role: 'admin',
       },
     });
-    console.log('✅ Master Admin account created.');
+    console.log('Master Admin account created.');
+    console.log('==============================================================');
+    console.log('초기 관리자 임시 비밀번호 (1회만 표시, 안전한 곳에 보관 후 변경):');
+    console.log(tempPassword);
+    console.log('==============================================================');
   } else {
-    console.log('✅ Master Admin account verified.');
+    console.log('Master Admin account verified.');
   }
 
-  console.log('🎉 Production database ready.');
+  console.log('Production database ready.');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error initializing database:', e);
+    console.error('Error initializing database:', e);
     process.exit(1);
   })
   .finally(async () => {

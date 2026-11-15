@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import crypto from 'crypto';
-
-function hashPassword(password: string) {
-  return crypto.createHash('sha256').update(password).digest('hex');
-}
+// [보안] bcrypt 해싱으로 교체 (SHA-256 무솔트 제거)
+import { hashPassword } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
@@ -83,9 +80,10 @@ export async function POST(request: Request) {
         );
       }
 
-      if (newPassword.length < 4) {
+      // [보안] 최소 비밀번호 길이 강화 (4자 → 8자)
+      if (newPassword.length < 8) {
         return NextResponse.json(
-          { success: false, error: '비밀번호는 최소 4자 이상이어야 합니다.' },
+          { success: false, error: '비밀번호는 최소 8자 이상이어야 합니다.' },
           { status: 400 }
         );
       }
@@ -151,7 +149,7 @@ export async function POST(request: Request) {
         }
 
         // Update password hash
-        const hashedPassword = hashPassword(newPassword);
+        const hashedPassword = await hashPassword(newPassword);
         await prisma.user.update({
           where: { id: user.id },
           data: { passwordHash: hashedPassword },

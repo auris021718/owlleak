@@ -3,6 +3,8 @@ import { jwtVerify } from 'jose';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
 import { getPartnerClassification } from '@/lib/partnerType';
+// [보안] fallback 시크릿 제거
+import { getJwtSecret } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
@@ -15,8 +17,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
     }
 
-    const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret));
+    const jwtSecret = getJwtSecret();
+    const { payload } = await jwtVerify(token, jwtSecret);
     const partnerId = payload.partnerId as number | null;
 
     if (!partnerId) {

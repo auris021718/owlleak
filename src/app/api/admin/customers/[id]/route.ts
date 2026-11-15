@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+// [보안] 관리자 API는 role === 'admin' 검증 필수
+import { requireAdmin } from '@/lib/auth';
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await requireAdmin(request))) {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
     const { id } = await params;
     const customerId = parseInt(id, 10);
     if (isNaN(customerId)) {
@@ -47,6 +52,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await requireAdmin(request))) {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
     const { id } = await params;
     const customerId = parseInt(id, 10);
     if (isNaN(customerId)) {
@@ -84,6 +92,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await requireAdmin(request))) {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
     const { id } = await params;
     const customerId = parseInt(id, 10);
     if (isNaN(customerId)) {

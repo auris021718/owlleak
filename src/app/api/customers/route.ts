@@ -59,8 +59,10 @@ export async function POST(request: Request) {
     const match = cookieHeader.match(/admin_session=([^;]+)/);
     if (match) {
       try {
-        const jwtSecret = process.env.JWT_SECRET || "fallback_secret";
-        const { payload } = await jwtVerify(match[1], new TextEncoder().encode(jwtSecret));
+        // [보안] fallback 시크릿 제거
+        const { getJwtSecret } = await import("@/lib/auth");
+        const jwtSecret = getJwtSecret();
+        const { payload } = await jwtVerify(match[1], jwtSecret);
         sessionPartnerId = (payload.partnerId as number) || null;
       } catch (e) {
         // ignore

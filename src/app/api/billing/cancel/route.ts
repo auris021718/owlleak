@@ -12,8 +12,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
     }
 
-    const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret));
+    // [보안] fallback 시크릿 제거
+    const { getJwtSecret } = await import('@/lib/auth');
+    const jwtSecret = getJwtSecret();
+    const { payload } = await jwtVerify(token, jwtSecret);
     const partnerId = payload.partnerId as number | null;
 
     if (!partnerId) {

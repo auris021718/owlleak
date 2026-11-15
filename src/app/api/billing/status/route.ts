@@ -13,8 +13,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ authenticated: false, subscription: null }, { status: 200 });
     }
 
-    const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret));
+    // [보안] fallback 시크릿 제거
+    const { getJwtSecret } = await import('@/lib/auth');
+    const jwtSecret = getJwtSecret();
+    const { payload } = await jwtVerify(token, jwtSecret);
     const partnerId = payload.partnerId as number | null;
     const role = (payload.role as string) || 'partner';
 

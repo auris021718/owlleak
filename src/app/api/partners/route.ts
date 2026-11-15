@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import crypto from 'crypto';
-
-function hashPassword(password: string) {
-  return crypto.createHash('sha256').update(password).digest('hex');
-}
+// [보안] bcrypt 해싱 + 임시 비밀번호 자동 생성 (하드코딩 '1234!' 제거)
+import { hashPassword, randomPassword } from '@/lib/auth';
 
 export async function GET(request: Request) {
   try {
@@ -73,17 +70,22 @@ export async function POST(request: Request) {
     }
 
     let userId: number | null = null;
+    // [보안] 비밀번호 미입력 시 '1234!' 같은 고정값 대신 1회성 임시 비밀번호 생성
+    let temporaryPassword: string | null = null;
     if (email) {
       // Check if user already exists
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
         userId = existingUser.id;
       } else {
-        const defaultPw = password ? hashPassword(password) : hashPassword('1234!');
+        const plainPw = password && String(password).length >= 8 ? String(password) : randomPassword(12);
+        if (!password || String(password).length < 8) {
+          temporaryPassword = plainPw;
+        }
         const newUser = await prisma.user.create({
           data: {
             email,
-            passwordHash: defaultPw,
+            passwordHash: await hashPassword(plainPw),
             name: contactName || companyName,
             phone,
             role: 'partner',
@@ -113,7 +115,20 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, data: partner });
+    // [보안] 응답에서 passwordHash 제거 (민감 정보 노출 방지)
+    const safePartner = {
+      ...partner,
+      user: partner.user
+        ? (({ passwordHash: _omit, ...rest }) => rest)(partner.user as any)
+        : null,
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: safePartner,
+      // 임시 비밀번호가 생성된 경우 1회만 전달 (관리자가 파트너에게 별도 전달)
+      ...(temporaryPassword ? { temporaryPassword } : {}),
+    });
   } catch (error) {
     console.error('Failed to create partner:', error);
     return NextResponse.json({ success: false, error: '협력사 등록 중 오류가 발생했습니다.' }, { status: 500 });
