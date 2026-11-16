@@ -57,14 +57,40 @@ export async function POST(request: Request) {
         );
       }
 
+      // [보안] 반복 실패로 잠긴 계정은 비밀번호 확인 전에 차단
+      if (user.lockedUntil && user.lockedUntil > new Date()) {
+        return NextResponse.json(
+          { success: false, error: '로그인 시도가 많아 계정이 일시적으로 잠겼습니다. 15분 후 다시 시도해 주세요.' },
+          { status: 423 }
+        );
+      }
+
       // [보안] bcrypt 검증 (+ 구 SHA-256 해시 호환). 마스터 비밀번호로 타 계정 로그인 불가.
       const isPasswordValid = await verifyPassword(password, user.passwordHash);
 
       if (!isPasswordValid) {
+        // [보안] 실패 횟수 누적 — 5회 연속 실패 시 15분 잠금
+        const failedCount = user.failedLoginCount + 1;
+        const shouldLock = failedCount >= 5;
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failedLoginCount: shouldLock ? 0 : failedCount,
+            ...(shouldLock ? { lockedUntil: new Date(Date.now() + 15 * 60 * 1000) } : {}),
+          },
+        });
         return NextResponse.json(
           { success: false, error: '비밀번호가 일치하지 않습니다.' },
           { status: 401 }
         );
+      }
+
+      // [보안] 로그인 성공 시 실패 카운터 초기화
+      if (user.failedLoginCount > 0 || user.lockedUntil) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { failedLoginCount: 0, lockedUntil: null },
+        });
       }
 
       // [보안] 구 SHA-256 해시는 이번 로그인에 성공했으므로 bcrypt로 자동 마이그레이션

@@ -27,6 +27,8 @@ model User {
   name         String
   phone        String?
   role         String         @default("partner") // "admin" | "partner"
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
   createdAt    DateTime       @default(now())
   partner      Partner?
   taskLogs     TaskLog[]
