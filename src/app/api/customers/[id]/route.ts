@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getSession, canAccessTask } from "@/lib/auth";
 
 export async function PUT(
   request: Request,
@@ -10,6 +11,12 @@ export async function PUT(
     const id = parseInt(idStr);
     if (isNaN(id)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
+
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
     }
 
     let body;
@@ -31,6 +38,11 @@ export async function PUT(
 
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    // [보안] 파트너는 본인 작업에 연결된 고객만 수정 가능
+    if (!(await canAccessTask(session, id))) {
+      return NextResponse.json({ error: "접근 권한이 없습니다." }, { status: 403 });
     }
 
     // 2. Update Customer
@@ -112,6 +124,15 @@ export async function DELETE(
     const id = parseInt(idStr);
     if (isNaN(id)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
+
+    // [보안] 로그인 + 작업 접근 권한 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+    }
+    if (!(await canAccessTask(session, id))) {
+      return NextResponse.json({ error: "접근 권한이 없습니다." }, { status: 403 });
     }
 
     // 1. Find task to get estimateId

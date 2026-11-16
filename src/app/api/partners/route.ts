@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 // [보안] bcrypt 해싱 + 임시 비밀번호 자동 생성 (하드코딩 '1234!' 제거)
-import { hashPassword, randomPassword } from '@/lib/auth';
+import { hashPassword, randomPassword, getSession } from '@/lib/auth';
 
 export async function GET(request: Request) {
   try {
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const specialty = searchParams.get('specialty');
@@ -52,6 +58,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       companyName,

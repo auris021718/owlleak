@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
 
 export async function GET(
   request: Request,
@@ -10,6 +11,15 @@ export async function GET(
     const partnerId = parseInt(id, 10);
     if (isNaN(partnerId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 파트너 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 파트너 상세(작업·정산 포함)는 본인과 관리자만 조회 가능
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+    if (session.role !== 'admin' && session.partnerId !== partnerId) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
     }
 
     const partner = await prisma.partner.findUnique({
@@ -46,6 +56,15 @@ export async function PATCH(
     const partnerId = parseInt(id, 10);
     if (isNaN(partnerId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 파트너 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 파트너 정보 수정은 본인과 관리자만 가능
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+    if (session.role !== 'admin' && session.partnerId !== partnerId) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -98,6 +117,15 @@ export async function DELETE(
     const partnerId = parseInt(id, 10);
     if (isNaN(partnerId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 파트너 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 파트너 삭제는 관리자 전용
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+    if (session.role !== 'admin') {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
     }
 
     await prisma.partner.delete({

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getSession, canAccessPartner } from '@/lib/auth';
 
 export async function GET(
   request: Request,
@@ -10,6 +11,12 @@ export async function GET(
     const settlementId = parseInt(id, 10);
     if (isNaN(settlementId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
     }
 
     const settlement = await prisma.settlement.findUnique({
@@ -30,6 +37,11 @@ export async function GET(
       return NextResponse.json({ success: false, error: '정산 내역을 찾을 수 없습니다.' }, { status: 404 });
     }
 
+    // [보안] 파트너는 본인 정산만 조회 가능
+    if (!canAccessPartner(session, settlement.partnerId)) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
+    }
+
     return NextResponse.json({ success: true, data: settlement });
   } catch (error) {
     console.error('Failed to get settlement:', error);
@@ -46,6 +58,17 @@ export async function PATCH(
     const settlementId = parseInt(id, 10);
     if (isNaN(settlementId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+
+    // [보안] 정산 수정은 관리자 전용
+    if (session.role !== 'admin') {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -82,6 +105,17 @@ export async function DELETE(
     const settlementId = parseInt(id, 10);
     if (isNaN(settlementId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+
+    // [보안] 정산 삭제는 관리자 전용
+    if (session.role !== 'admin') {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
     }
 
     await prisma.settlement.delete({

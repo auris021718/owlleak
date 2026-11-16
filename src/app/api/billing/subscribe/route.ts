@@ -36,7 +36,8 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const { cardNumber, cardExpiry } = body;
 
-    const planPrice = body.planPrice || classification.monthlyPrice;
+    // [운영] 가격은 서버에서만 결정한다 (클라이언트가 보낸 planPrice는 신뢰하지 않음)
+    const planPrice = classification.monthlyPrice;
     const planType = classification.planType;
 
     // 3. Generate mock billing key & customer key (Toss Payments simulation)

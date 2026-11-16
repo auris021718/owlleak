@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getSession, canAccessTask } from '@/lib/auth';
 
 export async function GET(
   request: Request,
@@ -10,6 +11,15 @@ export async function GET(
     const taskId = parseInt(id, 10);
     if (isNaN(taskId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 Task ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 로그인 + 작업 접근 권한 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+    if (!(await canAccessTask(session, taskId))) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
     }
 
     const logs = await prisma.taskLog.findMany({
@@ -38,6 +48,15 @@ export async function POST(
       return NextResponse.json({ success: false, error: '유효하지 않은 Task ID입니다.' }, { status: 400 });
     }
 
+    // [보안] 로그인 + 작업 접근 권한 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+    if (!(await canAccessTask(session, taskId))) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { action, description, userId } = body;
 
@@ -50,7 +69,7 @@ export async function POST(
         taskId,
         action,
         description: description || null,
-        userId: userId ? parseInt(String(userId), 10) : null,
+        userId: session.userId, // [보안] 작성자는 세션 기준으로 기록 (요청값 신뢰 안 함)
       },
       include: {
         user: { select: { id: true, name: true, role: true } },
@@ -75,6 +94,15 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: '유효하지 않은 Task ID입니다.' }, { status: 400 });
     }
 
+    // [보안] 로그인 + 작업 접근 권한 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+    if (!(await canAccessTask(session, taskId))) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const body = await request.json();
     const logId = searchParams.get('logId') || body.logId;
@@ -94,6 +122,12 @@ export async function PATCH(
     }
     if (description !== undefined) {
       updateData.description = description ? description.trim() : null;
+    }
+
+    // [보안] 수정 대상 일지가 이 작업의 일지인지 확인
+    const targetLog = await prisma.taskLog.findUnique({ where: { id: parsedLogId }, select: { taskId: true } });
+    if (!targetLog || targetLog.taskId !== taskId) {
+      return NextResponse.json({ success: false, error: '작업 일지를 찾을 수 없습니다.' }, { status: 404 });
     }
 
     const updatedLog = await prisma.taskLog.update({
@@ -122,6 +156,15 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: '유효하지 않은 Task ID입니다.' }, { status: 400 });
     }
 
+    // [보안] 로그인 + 작업 접근 권한 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+    if (!(await canAccessTask(session, taskId))) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     let logId = searchParams.get('logId');
     if (!logId) {
@@ -136,6 +179,12 @@ export async function DELETE(
     const parsedLogId = parseInt(String(logId), 10);
     if (isNaN(parsedLogId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 일지 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 삭제 대상 일지가 이 작업의 일지인지 확인
+    const targetLog = await prisma.taskLog.findUnique({ where: { id: parsedLogId }, select: { taskId: true } });
+    if (!targetLog || targetLog.taskId !== taskId) {
+      return NextResponse.json({ success: false, error: '작업 일지를 찾을 수 없습니다.' }, { status: 404 });
     }
 
     await prisma.taskLog.deleteMany({

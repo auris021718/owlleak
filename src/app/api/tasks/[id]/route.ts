@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getSession, canAccessTask } from '@/lib/auth';
 
 export async function GET(
   request: Request,
@@ -10,6 +11,12 @@ export async function GET(
     const taskId = parseInt(id, 10);
     if (isNaN(taskId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 작업 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
     }
 
     const task = await prisma.task.findUnique({
@@ -30,6 +37,11 @@ export async function GET(
       return NextResponse.json({ success: false, error: '작업을 찾을 수 없습니다.' }, { status: 404 });
     }
 
+    // [보안] 파트너는 본인 배정/등록 작업만 조회 가능
+    if (session.role !== 'admin' && task.partnerId !== session.partnerId && task.registeredByPartnerId !== session.partnerId) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
+    }
+
     return NextResponse.json({ success: true, data: task });
   } catch (error) {
     console.error('Failed to get task:', error);
@@ -46,6 +58,15 @@ export async function PATCH(
     const taskId = parseInt(id, 10);
     if (isNaN(taskId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 작업 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+    if (!(await canAccessTask(session, taskId))) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -72,7 +93,10 @@ export async function PATCH(
     if (type !== undefined) updateData.type = type;
     if (description !== undefined) updateData.description = description;
     if (partnerId !== undefined) {
-      updateData.partnerId = partnerId ? parseInt(String(partnerId), 10) : null;
+      // [보안] 파트너는 작업을 다른 파트너에게 재배정할 수 없음
+      updateData.partnerId = session.role === 'admin'
+        ? (partnerId ? parseInt(String(partnerId), 10) : null)
+        : session.partnerId;
     }
     if (customerId !== undefined) {
       updateData.customerId = customerId ? parseInt(String(customerId), 10) : null;
@@ -104,6 +128,15 @@ export async function DELETE(
     const taskId = parseInt(id, 10);
     if (isNaN(taskId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 작업 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+    if (!(await canAccessTask(session, taskId))) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
     }
 
     // 외래키 제약조건 방지를 위해 연관된 정산, 사진, 로그를 트랜잭션으로 안전하게 함께 정리

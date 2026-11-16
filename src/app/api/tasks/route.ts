@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
 
 export async function GET(request: Request) {
   try {
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const partnerId = searchParams.get('partnerId');
@@ -12,7 +19,16 @@ export async function GET(request: Request) {
     if (status && status !== 'all') {
       where.status = status;
     }
-    if (partnerId) {
+    // [보안] 파트너는 본인 배정/등록 작업만 조회 (쿼리 파라미터로 타 파트너 지정 불가)
+    if (session.role !== 'admin') {
+      if (!session.partnerId) {
+        return NextResponse.json({ success: true, data: [] });
+      }
+      where.OR = [
+        { partnerId: session.partnerId },
+        { registeredByPartnerId: session.partnerId },
+      ];
+    } else if (partnerId) {
       where.partnerId = parseInt(partnerId, 10);
     }
     if (date) {
@@ -47,6 +63,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       title,
@@ -74,7 +96,7 @@ export async function POST(request: Request) {
         location,
         type,
         description,
-        partnerId: partnerId ? parseInt(String(partnerId), 10) : null,
+        partnerId: session.role === 'admin' ? (partnerId ? parseInt(String(partnerId), 10) : null) : session.partnerId,
         customerId: customerId ? parseInt(String(customerId), 10) : null,
         estimateId: estimateId ? parseInt(String(estimateId), 10) : null,
       },

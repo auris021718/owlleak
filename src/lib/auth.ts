@@ -7,6 +7,7 @@
 import { jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import prisma from '@/lib/prisma';
 
 const BCRYPT_COST = 12;
 const LEGACY_SHA256_RE = /^[a-f0-9]{64}$/;
@@ -103,4 +104,22 @@ export async function requireAdmin(request: Request): Promise<SessionPayload | n
   const session = await getSession(request);
   if (!session || session.role !== 'admin') return null;
   return session;
+}
+
+/** 파트너 본인 데이터 접근 여부 (관리자는 전체 허용) */
+export function canAccessPartner(session: SessionPayload, partnerId: number | null | undefined): boolean {
+  if (session.role === 'admin') return true;
+  return partnerId != null && session.partnerId === partnerId;
+}
+
+/** 작업 단위 접근 여부: 관리자는 전체, 파트너는 배정받았거나 등록한 작업만 */
+export async function canAccessTask(session: SessionPayload, taskId: number): Promise<boolean> {
+  if (session.role === 'admin') return true;
+  if (!session.partnerId) return false;
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { partnerId: true, registeredByPartnerId: true },
+  });
+  if (!task) return false;
+  return task.partnerId === session.partnerId || task.registeredByPartnerId === session.partnerId;
 }

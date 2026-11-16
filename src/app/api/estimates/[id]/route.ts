@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAdmin } from '@/lib/auth';
 
 export async function GET(
   request: Request,
@@ -10,6 +11,12 @@ export async function GET(
     const estId = parseInt(id, 10);
     if (isNaN(estId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 견적 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 견적 상세/배정/삭제는 관리자 전용
+    const admin = await requireAdmin(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
     }
 
     const estimate = await prisma.estimate.findUnique({
@@ -45,6 +52,12 @@ export async function PATCH(
     const estId = parseInt(id, 10);
     if (isNaN(estId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 견적 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 견적 상세/배정/삭제는 관리자 전용
+    const admin = await requireAdmin(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -128,6 +141,12 @@ export async function DELETE(
     const estId = parseInt(id, 10);
     if (isNaN(estId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 견적 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 견적 상세/배정/삭제는 관리자 전용
+    const admin = await requireAdmin(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
     }
 
     // Delete task first if exists

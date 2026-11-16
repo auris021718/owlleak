@@ -43,6 +43,15 @@ export async function GET(request: Request) {
         },
       });
 
+      // [운영] 기간이 지난 active 구독은 past_due로 전환해 만료 후 이용을 막는다
+      if (subscription && subscription.status === 'active' && subscription.currentPeriodEnd < new Date()) {
+        await prisma.subscription.update({
+          where: { id: subscription.id },
+          data: { status: 'past_due' },
+        });
+        subscription.status = 'past_due';
+      }
+
       const isSubscribed = subscription?.status === 'active';
 
       return NextResponse.json({

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getSession, canAccessTask } from '@/lib/auth';
 
 export async function GET(
   request: Request,
@@ -12,6 +13,12 @@ export async function GET(
       return NextResponse.json({ success: false, error: '유효하지 않은 일지 ID입니다.' }, { status: 400 });
     }
 
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+
     const log = await prisma.taskLog.findUnique({
       where: { id: parsedLogId },
       include: {
@@ -21,6 +28,10 @@ export async function GET(
 
     if (!log) {
       return NextResponse.json({ success: false, error: '작업 일지를 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    if (!(await canAccessTask(session, log.taskId))) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
     }
 
     return NextResponse.json({ success: true, data: log });
@@ -41,6 +52,12 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: '유효하지 않은 일지 ID입니다.' }, { status: 400 });
     }
 
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { action, description } = body;
 
@@ -53,6 +70,15 @@ export async function PATCH(
     }
     if (description !== undefined) {
       updateData.description = description ? description.trim() : null;
+    }
+
+    // [보안] 일지가 속한 작업에 대한 접근 권한 확인
+    const log = await prisma.taskLog.findUnique({ where: { id: parsedLogId }, select: { taskId: true } });
+    if (!log) {
+      return NextResponse.json({ success: false, error: '작업 일지를 찾을 수 없습니다.' }, { status: 404 });
+    }
+    if (!(await canAccessTask(session, log.taskId))) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
     }
 
     const updatedLog = await prisma.taskLog.update({
@@ -79,6 +105,21 @@ export async function DELETE(
     const parsedLogId = parseInt(logId, 10);
     if (isNaN(parsedLogId)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 일지 ID입니다.' }, { status: 400 });
+    }
+
+    // [보안] 로그인 세션 필수
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 });
+    }
+
+    // [보안] 일지가 속한 작업에 대한 접근 권한 확인
+    const log = await prisma.taskLog.findUnique({ where: { id: parsedLogId }, select: { taskId: true } });
+    if (!log) {
+      return NextResponse.json({ success: false, error: '작업 일지를 찾을 수 없습니다.' }, { status: 404 });
+    }
+    if (!(await canAccessTask(session, log.taskId))) {
+      return NextResponse.json({ success: false, error: '접근 권한이 없습니다.' }, { status: 403 });
     }
 
     await prisma.taskLog.deleteMany({

@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // [보안] 관리자 전용
+    const admin = await requireAdmin(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
+
     const allSettlements = await prisma.settlement.findMany({
       include: {
         partner: true,
