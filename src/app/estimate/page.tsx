@@ -304,23 +304,8 @@ export default function EstimateChecklistPage() {
         console.error("견적 DB 저장 실패:", dbData.error);
       }
 
-      // 2. 알림톡 발송
-      const res = await fetch("/api/kakao/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phoneNumber: customerPhone,
-          templateId: "TPL_ESTIMATE_002",
-          templateParams: {
-            estimate: estimatedPrice,
-            works: requiredWorks.join(", ") || "세부 점검 필요",
-            damage: [...damageAreas, ...(customDamageArea ? [customDamageArea] : [])].join(", ") || "미지정",
-            leakLocation: basicInfo.leakLocation || "현장 확인"
-          }
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
+      // 2. 알림톡은 견적 저장 API가 서버에서 직접 발송한다 (공개 발송 엔드포인트 호출 제거)
+      if (dbData.success) {
         setSendSuccess(true);
       }
     } catch (e) {

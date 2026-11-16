@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { sendAlimtalk } from "@/lib/alimtalk";
 
 export async function POST(request: Request) {
   try {
@@ -85,7 +86,24 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, estimate });
+    // [운영] 견적 접수 알림톡 — 공개 발송 엔드포인트를 거치지 않고 서버에서 직접 발송한다.
+    // 발송 실패가 견적 저장을 막지 않도록 결과만 응답에 포함한다.
+    const alimtalk = await sendAlimtalk({
+      to: customerPhone || "",
+      templateId: "TPL_ESTIMATE_002",
+      params: {
+        estimate: estimatedPrice,
+        works: Array.isArray(requiredWorks) ? requiredWorks.join(", ") : "",
+        damage: [...(damageAreas || []), ...(customDamageArea ? [customDamageArea] : [])].join(", "),
+        leakLocation: basicInfo?.leakLocation || "",
+        detectionFee,
+      },
+    }).catch((e) => {
+      console.error("Alimtalk dispatch failed:", e);
+      return null;
+    });
+
+    return NextResponse.json({ success: true, estimate, alimtalk });
   } catch (error) {
     console.error("Failed to save estimate:", error);
     return NextResponse.json(
