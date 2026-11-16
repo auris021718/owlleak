@@ -19,6 +19,7 @@ const SAMPLE_LEAK_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2
 
 interface DiagnosisResult {
   success: boolean;
+  aiAnalyzed?: boolean;
   type: string;
   typeName: string;
   probability: number;
@@ -88,19 +89,42 @@ export default function AIDiagnosisPage() {
   };
 
   const processFile = (file: File) => {
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setImageSrc(event.target.result as string);
-          setTargetPoint(null);
-          setStep('target');
-        }
-      };
-      reader.readAsDataURL(file);
-    } else {
+    if (!file || !file.type.startsWith('image/')) {
       showToast('이미지 파일(JPG, PNG 등)만 등록 가능합니다.');
+      return;
     }
+    // [운영] 원본 사진은 전송 용량 제한에 걸릴 수 있어 최대 1280px JPEG로 줄여서 보낸다
+    const objectUrl = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      try {
+        const MAX = 1280;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('no 2d context');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setImageSrc(canvas.toDataURL('image/jpeg', 0.82));
+      } catch {
+        // 리사이즈 실패 시 원본 그대로 사용
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) setImageSrc(event.target.result as string);
+        };
+        reader.readAsDataURL(file);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+      setTargetPoint(null);
+      setStep('target');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      showToast('이미지를 읽지 못했습니다. 다른 사진으로 시도해 주세요.');
+    };
+    img.src = objectUrl;
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -510,6 +534,11 @@ export default function AIDiagnosisPage() {
                   <span className="text-[10px] font-bold tracking-wider bg-yellow-400 text-blue-900 px-2 py-0.5 rounded-md">누수 신뢰도 매칭 완료</span>
                   <h3 className="font-bold text-[15px]">{result.typeName}</h3>
                   <p className="text-[11px] text-blue-200">탐지 지점: {result.locationName}</p>
+                  <p className="text-[11px] mt-1">
+                    {result.aiAnalyzed
+                      ? <span className="text-emerald-300 font-semibold">AI 비전 분석 결과</span>
+                      : <span className="text-amber-300 font-semibold">기본 안내 (AI 분석 아님)</span>}
+                  </p>
                 </div>
               </div>
 
